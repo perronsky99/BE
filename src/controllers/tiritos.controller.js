@@ -1,13 +1,64 @@
 const Tirito = require('../models/Tirito');
 
+/**
+ * Transforma un tirito de MongoDB al formato esperado por el frontend
+ */
+const transformTirito = (tirito) => ({
+  id: tirito._id.toString(),
+  title: tirito.title,
+  description: tirito.description,
+  status: tirito.status,
+  images: tirito.images.map((img, idx) => ({
+    id: `${tirito._id}-${idx}`,
+    url: img,
+    thumbnailUrl: img
+  })),
+  creatorId: tirito.createdBy?._id?.toString() || tirito.createdBy?.toString(),
+  creatorName: tirito.createdBy?.name || 'Usuario',
+  creatorAvatar: null,
+  location: tirito.location || null,
+  createdAt: tirito.createdAt,
+  updatedAt: tirito.updatedAt || tirito.createdAt
+});
+
 // GET /api/tiritos
 const getTiritos = async (req, res, next) => {
   try {
-    const tiritos = await Tirito.find({ status: { $ne: 'closed' } })
-      .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 });
+    const { status, search, page = 1, limit = 12 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    res.json({ tiritos });
+    // Construir filtro
+    const filter = {};
+    
+    // Por defecto excluir cerrados, a menos que se pida específicamente
+    if (status && status !== 'all') {
+      filter.status = status;
+    } else {
+      filter.status = { $ne: 'closed' };
+    }
+
+    // Búsqueda por texto en título o descripción
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const total = await Tirito.countDocuments(filter);
+    const tiritos = await Tirito.find(filter)
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      data: tiritos.map(transformTirito),
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      hasMore: skip + tiritos.length < total
+    });
   } catch (error) {
     next(error);
   }
@@ -23,7 +74,7 @@ const getTiritoById = async (req, res, next) => {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
 
-    res.json({ tirito });
+    res.json(transformTirito(tirito));
   } catch (error) {
     next(error);
   }
@@ -65,7 +116,7 @@ const createTirito = async (req, res, next) => {
 
     res.status(201).json({
       message: 'Tirito creado correctamente',
-      tirito
+      tirito: transformTirito(tirito)
     });
   } catch (error) {
     next(error);
@@ -101,7 +152,7 @@ const updateTiritoStatus = async (req, res, next) => {
 
     res.json({
       message: 'Status actualizado',
-      tirito
+      tirito: transformTirito(tirito)
     });
   } catch (error) {
     next(error);
@@ -115,7 +166,36 @@ const getMyTiritos = async (req, res, next) => {
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
 
-    res.json({ tiritos });
+    res.json({
+      data: tiritos.map(transformTirito),
+      total: tiritos.length,
+      page: 1,
+      limit: tiritos.length,
+      hasMore: false
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/tiritos/can-create - Verificar si puede crear tirito
+const canCreateTirito = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const activeTiritos = await Tirito.countDocuments({
+      createdBy: userId,
+      status: { $in: ['open', 'in_progress'] }
+    });
+
+    if (activeTiritos >= 1) {
+      return res.json({
+        canCreate: false,
+        message: 'Ya tenés un tirito activo. Cerralo antes de crear otro.'
+      });
+    }
+
+    res.json({ canCreate: true });
   } catch (error) {
     next(error);
   }
@@ -126,5 +206,6 @@ module.exports = {
   getTiritoById,
   createTirito,
   updateTiritoStatus,
-  getMyTiritos
+  getMyTiritos,
+  canCreateTirito
 };
