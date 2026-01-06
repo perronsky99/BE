@@ -1,6 +1,8 @@
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const Tirito = require('../models/Tirito');
+const User = require('../models/User');
+const { createNotification } = require('./notifications.controller');
 
 // GET /api/chats/:tiritoId
 const getChat = async (req, res, next) => {
@@ -60,11 +62,16 @@ const sendMessage = async (req, res, next) => {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
 
+    // Obtener datos del usuario que envía el mensaje
+    const sender = await User.findById(userId).select('name');
+
     // Buscar o crear chat
     let chat = await Chat.findOne({
       tiritoId,
       participants: userId
     });
+
+    const isNewChat = !chat;
 
     if (!chat) {
       chat = await Chat.create({
@@ -82,9 +89,35 @@ const sendMessage = async (req, res, next) => {
 
     await message.populate('sender', 'name email');
 
+    // Determinar quién recibe la notificación (el otro participante)
+    const recipientId = chat.participants.find(p => p.toString() !== userId);
+
+    // Crear notificación para el receptor
+    if (recipientId) {
+      const notificationType = isNewChat ? 'chat_new' : 'chat_message';
+      const notificationTitle = isNewChat 
+        ? `${sender?.name || 'Alguien'} te contactó`
+        : `Nuevo mensaje de ${sender?.name || 'alguien'}`;
+      const notificationMessage = isNewChat
+        ? `Alguien está interesado en tu tirito "${tirito.title}"`
+        : content.trim().substring(0, 100);
+
+      await createNotification({
+        userId: recipientId,
+        type: notificationType,
+        title: notificationTitle,
+        message: notificationMessage,
+        fromUserId: userId,
+        tiritoId: tiritoId,
+        chatId: chat._id,
+        actionUrl: `/chat/${tiritoId}`
+      });
+    }
+
     res.status(201).json({
       message: 'Mensaje enviado',
-      data: message
+      data: message,
+      isNewChat
     });
   } catch (error) {
     next(error);

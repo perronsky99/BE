@@ -8,7 +8,7 @@ const transformTirito = (tirito) => ({
   title: tirito.title,
   description: tirito.description,
   status: tirito.status,
-  images: tirito.images.map((img, idx) => ({
+  images: (tirito.images || []).map((img, idx) => ({
     id: `${tirito._id}-${idx}`,
     url: img,
     thumbnailUrl: img
