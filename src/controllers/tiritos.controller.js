@@ -178,6 +178,34 @@ const getMyTiritos = async (req, res, next) => {
   }
 };
 
+// GET /api/tiritos/creator/:creatorId - Obtener tiritos por creatorId (público)
+const getTiritosByCreator = async (req, res, next) => {
+  try {
+    const { creatorId } = req.params;
+    const { page = 1, limit = 12 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const filter = { createdBy: creatorId };
+
+    const total = await Tirito.countDocuments(filter);
+    const tiritos = await Tirito.find(filter)
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      data: tiritos.map(transformTirito),
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      hasMore: skip + tiritos.length < total
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET /api/tiritos/can-create - Verificar si puede crear tirito
 const canCreateTirito = async (req, res, next) => {
   try {
@@ -208,4 +236,5 @@ module.exports = {
   updateTiritoStatus,
   getMyTiritos,
   canCreateTirito
+  ,getTiritosByCreator
 };

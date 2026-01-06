@@ -6,7 +6,8 @@ const {
   createTirito,
   updateTiritoStatus,
   getMyTiritos,
-  canCreateTirito
+  canCreateTirito,
+  getTiritosByCreator
 } = require('../controllers/tiritos.controller');
 const auth = require('../middlewares/auth.middleware');
 const upload = require('../utils/upload');
@@ -14,12 +15,16 @@ const upload = require('../utils/upload');
 // GET /api/tiritos - Público (lista de tiritos abiertos)
 router.get('/', getTiritos);
 
+// GET /api/tiritos/creator/:creatorId - Tiritos publicados por un creator (público)
+router.get('/creator/:creatorId', getTiritosByCreator);
+
 // Las siguientes rutas requieren autenticación
 router.use(auth);
 
 // IMPORTANTE: Rutas específicas ANTES de /:id para evitar conflictos
 // GET /api/tiritos/my - Mis tiritos
 router.get('/my', getMyTiritos);
+
 
 // GET /api/tiritos/me - Alias de /my (compatibilidad frontend)
 router.get('/me', getMyTiritos);
