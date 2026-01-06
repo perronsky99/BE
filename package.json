@@ -5,8 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
-    ,"find-orphan-tiritos": "node src/scripts/find-orphan-tiritos.js"
+    "dev": "nodemon src/server.js",
+    "find-orphan-tiritos": "node src/scripts/find-orphan-tiritos.js"
   },
   "keywords": [
     "tirito",
@@ -23,7 +23,8 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

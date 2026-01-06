@@ -122,6 +122,16 @@ const deleteNotification = async (req, res, next) => {
 const createNotification = async (data) => {
   try {
     const notification = await Notification.create(data);
+    // Emitir evento socket a usuario si está conectado
+    try {
+      const socketUtil = require('../utils/socket');
+      const io = socketUtil.getIO();
+      if (io && notification && notification.userId) {
+        io.to(`user_${notification.userId}`).emit('notification', notification);
+      }
+    } catch (err) {
+      console.warn('No se pudo emitir socket:', err.message || err);
+    }
     return notification;
   } catch (error) {
     console.error('Error creando notificación:', error);
@@ -135,5 +145,28 @@ module.exports = {
   markAsRead,
   markAllAsRead,
   deleteNotification,
-  createNotification
+  createNotification,
+  // utilidad para pruebas: crea y emite una notificación a userId
+  testNotification: async (req, res, next) => {
+    try {
+      const { userId } = req.params;
+      const { title = 'Notificación de prueba', message = 'Este es un mensaje de prueba', type = 'chat_message', actionUrl = '/' } = req.body || {};
+
+      const notification = await createNotification({
+        userId,
+        type,
+        title,
+        message,
+        fromUserId: req.user ? req.user.id : null,
+        actionUrl
+      });
+
+      if (!notification) return res.status(500).json({ message: 'No se pudo crear notificación' });
+
+      res.json({ notification });
+    } catch (error) {
+      next(error);
+    }
+  }
 };
+

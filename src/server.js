@@ -16,7 +16,13 @@ const startServer = async () => {
   try {
     await connectDB();
     
-    app.listen(port, () => {
+    const http = require('http');
+    const server = http.createServer(app);
+    // Inicializar socket.io
+    const socketUtil = require('./utils/socket');
+    socketUtil.init(server);
+
+    server.listen(port, () => {
       console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
       console.log(`📋 Health check: http://localhost:${port}/api/health`);
     });

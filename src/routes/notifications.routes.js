@@ -6,6 +6,7 @@ const {
   markAsRead,
   markAllAsRead,
   deleteNotification
+  ,testNotification
 } = require('../controllers/notifications.controller');
 const auth = require('../middlewares/auth.middleware');
 
@@ -26,5 +27,8 @@ router.put('/:id/read', markAsRead);
 
 // DELETE /api/notifications/:id - Eliminar notificación
 router.delete('/:id', deleteNotification);
+
+// POST /api/notifications/test/:userId - Crear notificación de prueba (autenticado)
+router.post('/test/:userId', testNotification);
 
 module.exports = router;

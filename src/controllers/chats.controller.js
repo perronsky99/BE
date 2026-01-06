@@ -90,7 +90,17 @@ const sendMessage = async (req, res, next) => {
     await message.populate('sender', 'name email');
 
     // Determinar quién recibe la notificación (el otro participante)
-    const recipientId = chat.participants.find(p => p.toString() !== userId);
+    // Normalizar participantes a IDs (soporta ObjectId o documentos poblados)
+    let recipientId = null;
+    if (Array.isArray(chat.participants)) {
+      for (const p of chat.participants) {
+        const pid = p && p._id ? p._id.toString() : (p ? p.toString() : null);
+        if (pid && pid !== userId.toString()) {
+          recipientId = pid;
+          break;
+        }
+      }
+    }
 
     // Crear notificación para el receptor
     if (recipientId) {
