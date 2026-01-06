@@ -122,15 +122,21 @@ const deleteNotification = async (req, res, next) => {
 const createNotification = async (data) => {
   try {
     const notification = await Notification.create(data);
+    const metrics = require('../utils/metrics');
+    const logger = require('../utils/logger');
+    metrics.inc('notifications_created', 1);
     // Emitir evento socket a usuario si está conectado
     try {
       const socketUtil = require('../utils/socket');
       const io = socketUtil.getIO();
       if (io && notification && notification.userId) {
         io.to(`user_${notification.userId}`).emit('notification', notification);
+        metrics.inc('notifications_emitted', 1);
+        logger.info('Notification emitted', { to: `user_${notification.userId}`, id: notification._id });
       }
     } catch (err) {
-      console.warn('No se pudo emitir socket:', err.message || err);
+      metrics.inc('notifications_failed_emits', 1);
+      logger.warn('No se pudo emitir socket', { err: err.message || err });
     }
     return notification;
   } catch (error) {

@@ -25,14 +25,18 @@ module.exports = {
         return next();
       });
 
+      const metrics = require('./metrics');
+      const logger = require('./logger');
+
       io.on('connection', (socket) => {
         try {
-          console.log('Socket conectado:', socket.id, 'userId=', socket.userId || 'anon');
+          metrics.inc('socket_connections', 1);
+          logger.info('Socket conectado', { id: socket.id, userId: socket.userId || null });
 
           // Auto-join to user room if authenticated
           if (socket.userId) {
             socket.join(`user_${socket.userId}`);
-            console.log(`Socket ${socket.id} se unió a room user_${socket.userId}`);
+            logger.info('Socket joined room', { socketId: socket.id, room: `user_${socket.userId}` });
           }
 
           // Fallback: allow manual register event (but still validate)
@@ -40,15 +44,16 @@ module.exports = {
             const uid = userId && (userId._id || userId.id) ? (userId._id || userId.id) : userId;
             if (uid) {
               socket.join(`user_${uid}`);
-              console.log(`Socket ${socket.id} se unió a room user_${uid} via register`);
+              logger.info('Socket joined room via register', { socketId: socket.id, room: `user_${uid}` });
             }
           });
 
           socket.on('disconnect', () => {
-            console.log('Socket desconectado:', socket.id);
+            metrics.inc('socket_disconnections', 1);
+            logger.info('Socket desconectado', { id: socket.id });
           });
         } catch (err) {
-          console.warn('Socket connection handler error:', err.message || err);
+          logger.warn('Socket connection handler error', { err: err.message || err });
         }
       });
 

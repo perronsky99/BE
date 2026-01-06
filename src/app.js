@@ -28,6 +28,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Tirito App Backend v1.0' });
 });
 
+// Exponer métricas simples (JSON)
+const metrics = require('./utils/metrics');
+app.get('/api/metrics', (req, res) => {
+  res.json(metrics.getMetrics());
+});
+
 // Rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);

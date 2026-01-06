@@ -5,9 +5,17 @@ const {
   getUnreadCount,
   markAsRead,
   markAllAsRead,
-  deleteNotification
-  ,testNotification
+  deleteNotification,
+  testNotification
 } = require('../controllers/notifications.controller');
+const rateLimit = require('express-rate-limit');
+
+const testLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 6, // max 6 test requests per minute
+  standardHeaders: true,
+  legacyHeaders: false
+});
 const auth = require('../middlewares/auth.middleware');
 
 // Todas las rutas requieren autenticación
@@ -29,6 +37,6 @@ router.put('/:id/read', markAsRead);
 router.delete('/:id', deleteNotification);
 
 // POST /api/notifications/test/:userId - Crear notificación de prueba (autenticado)
-router.post('/test/:userId', testNotification);
+router.post('/test/:userId', testLimiter, testNotification);
 
 module.exports = router;
