@@ -83,16 +83,15 @@ const getMyRequests = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    // Buscar tiritos del usuario que estén abiertos
-    const myTiritos = await Tirito.find({ createdBy: userId, status: 'open' }).select('_id');
+    // Buscar tiritos del usuario (incluir cualquier estado para historial)
+    const myTiritos = await Tirito.find({ createdBy: userId }).select('_id');
     const tiritoIds = myTiritos.map(t => t._id);
 
-    // Buscar solicitudes pendientes para esos tiritos
+    // Buscar solicitudes para esos tiritos (incluir cualquier estado)
     const requests = await TiritoRequest.find({
-      tirito: { $in: tiritoIds },
-      status: 'pending'
+      tirito: { $in: tiritoIds }
     })
-      .populate('tirito', 'title description images')
+      .populate('tirito', 'title description images status')
       .populate('requester', 'name email username')
       .sort({ createdAt: -1 });
 
@@ -104,7 +103,8 @@ const getMyRequests = async (req, res, next) => {
         tirito: {
           id: r.tirito._id,
           title: r.tirito.title,
-          description: r.tirito.description
+          description: r.tirito.description,
+          status: r.tirito.status
         },
         requester: {
           id: r.requester._id,
