@@ -1,5 +1,6 @@
 const Rating = require('../models/Rating');
 const Tirito = require('../models/Tirito');
+const mongoose = require('mongoose');
 
 // POST /api/ratings
 const createRating = async (req, res, next) => {
@@ -19,7 +20,9 @@ const createRating = async (req, res, next) => {
     }
 
     // Evitar autocalificación
-    if (raterId === targetId) return res.status(400).json({ message: 'No podés calificarte a vos mismo' });
+    if (raterId.toString() === targetId.toString()) {
+      return res.status(400).json({ message: 'No podés calificarte a vos mismo' });
+    }
 
     // Evitar duplicados por mismo tirito y rater
     const exists = await Rating.findOne({ tiritoId, raterId, targetId });
@@ -48,12 +51,18 @@ const getRatingsForUser = async (req, res, next) => {
 const getRatingsSummary = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const agg = await Rating.aggregate([
-      { $match: { targetId: require('mongoose').Types.ObjectId(userId) } },
-      { $group: { _id: '$targetId', avgScore: { $avg: '$score' }, count: { $sum: 1 } } }
-    ]);
-    const summary = agg[0] || { avgScore: 0, count: 0 };
-    res.json({ avgScore: summary.avgScore || 0, count: summary.count || 0 });
+    
+    // Usar find + JS para evitar problemas con ObjectId en aggregate
+    const ratings = await Rating.find({ targetId: userId });
+    
+    if (ratings.length === 0) {
+      return res.json({ avgScore: 0, count: 0 });
+    }
+    
+    const totalScore = ratings.reduce((sum, r) => sum + r.score, 0);
+    const avgScore = totalScore / ratings.length;
+    
+    res.json({ avgScore: Math.round(avgScore * 10) / 10, count: ratings.length });
   } catch (err) {
     next(err);
   }
