@@ -9,49 +9,33 @@ const { createNotification } = require('./notifications.controller');
  * Verificar si un usuario puede chatear en un tirito
  * Reglas:
  * - Nadie puede chatear si el tirito está cerrado
- * - Si el tirito está "open" sin asignar: solo pueden chatear si hay una solicitud activa
- *   - Creador puede chatear SI hay al menos una solicitud pending/accepted
- *   - Solicitante puede chatear SI tiene solicitud pending/accepted
- * - Si el tirito está "in_progress":
- *   - Creador puede chatear
- *   - Worker asignado puede chatear
+ * - Creador siempre puede escribir a solicitantes (si hay solicitud pending/accepted)
+ * - Solicitante puede escribir SOLO si:
+ *   - Su solicitud fue aceptada, O
+ *   - El creador ya le escribió primero (existe chat con mensajes del creador)
+ * - Si tirito en progreso: creador y worker asignado pueden chatear
  */
-const canUserChat = async (userId, tirito) => {
+const canUserChat = async (userId, tirito, otherUserId = null) => {
   const userIdStr = userId.toString();
-  const creatorIdStr = tirito.createdBy.toString();
-  const assignedToStr = tirito.assignedTo ? tirito.assignedTo.toString() : null;
+  const creatorIdStr = tirito.createdBy._id ? tirito.createdBy._id.toString() : tirito.createdBy.toString();
+  const assignedToStr = tirito.assignedTo 
+    ? (tirito.assignedTo._id ? tirito.assignedTo._id.toString() : tirito.assignedTo.toString()) 
+    : null;
 
   // Si el tirito está cerrado, nadie puede chatear
   if (tirito.status === 'closed') {
     return { canChat: false, reason: 'tirito_closed' };
   }
 
-  // Si el tirito está en progreso
-  if (tirito.status === 'in_progress') {
-    // El creador puede chatear
-    if (userIdStr === creatorIdStr) {
+  // === CREADOR ===
+  if (userIdStr === creatorIdStr) {
+    // En progreso: siempre puede chatear con el worker asignado
+    if (tirito.status === 'in_progress' && assignedToStr) {
       return { canChat: true, reason: null };
     }
-    // El worker asignado puede chatear
-    if (assignedToStr && userIdStr === assignedToStr) {
-      return { canChat: true, reason: null };
-    }
-    // Si no es creador ni asignado, no puede chatear
-    return { canChat: false, reason: 'not_assigned' };
-  }
-
-  // Si el tirito está abierto (open)
-  if (tirito.status === 'open') {
-    // Verificar si el usuario actual tiene una solicitud
-    const userRequest = await TiritoRequest.findOne({ 
-      tirito: tirito._id, 
-      requester: userId,
-      status: { $in: ['pending', 'accepted'] }
-    });
-
-    // Si es el creador
-    if (userIdStr === creatorIdStr) {
-      // El creador solo puede chatear si hay al menos una solicitud activa
+    
+    // Abierto: puede chatear si hay solicitudes activas
+    if (tirito.status === 'open') {
       const hasActiveRequests = await TiritoRequest.exists({ 
         tirito: tirito._id, 
         status: { $in: ['pending', 'accepted'] }
@@ -62,25 +46,63 @@ const canUserChat = async (userId, tirito) => {
       }
       return { canChat: true, reason: null };
     }
+  }
 
-    // Si es un solicitante
-    if (userRequest) {
+  // === NO ES EL CREADOR (es un solicitante/worker) ===
+  
+  // Si tirito está en progreso
+  if (tirito.status === 'in_progress') {
+    // Solo el worker asignado puede chatear
+    if (assignedToStr && userIdStr === assignedToStr) {
       return { canChat: true, reason: null };
     }
+    return { canChat: false, reason: 'not_assigned' };
+  }
 
-    // Verificar si tiene solicitud rechazada
-    const rejectedRequest = await TiritoRequest.findOne({ 
+  // Si tirito está abierto
+  if (tirito.status === 'open') {
+    // Buscar la solicitud del usuario
+    const userRequest = await TiritoRequest.findOne({ 
       tirito: tirito._id, 
-      requester: userId,
-      status: 'rejected'
+      requester: userId
     });
 
-    if (rejectedRequest) {
+    if (!userRequest) {
+      return { canChat: false, reason: 'no_request' };
+    }
+
+    if (userRequest.status === 'rejected') {
       return { canChat: false, reason: 'request_rejected' };
     }
 
-    // No tiene solicitud
-    return { canChat: false, reason: 'no_request' };
+    // Si la solicitud está aceptada, puede chatear
+    if (userRequest.status === 'accepted') {
+      return { canChat: true, reason: null };
+    }
+
+    // Si la solicitud está pending, solo puede chatear si el creador ya le escribió
+    if (userRequest.status === 'pending') {
+      // Buscar si existe un chat donde el creador haya enviado mensajes
+      const existingChat = await Chat.findOne({
+        tiritoId: tirito._id,
+        participants: { $all: [userId, creatorIdStr] }
+      });
+
+      if (existingChat) {
+        // Verificar si el creador envió al menos un mensaje
+        const creatorMessage = await Message.findOne({
+          chatId: existingChat._id,
+          sender: creatorIdStr
+        });
+
+        if (creatorMessage) {
+          return { canChat: true, reason: null };
+        }
+      }
+
+      // El creador no le ha escrito aún
+      return { canChat: false, reason: 'waiting_creator_message' };
+    }
   }
 
   // Estado desconocido
@@ -95,6 +117,7 @@ const getChat = async (req, res, next) => {
     const { tiritoId } = req.params;
     const { withUser } = req.query;
     const userId = req.user.id;
+    const userIdStr = userId.toString();
 
     // Verificar que existe el tirito
     const tirito = await Tirito.findById(tiritoId);
@@ -102,10 +125,12 @@ const getChat = async (req, res, next) => {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
 
+    const creatorIdStr = tirito.createdBy._id ? tirito.createdBy._id.toString() : tirito.createdBy.toString();
+
     // Verificar permisos de chat
     const { canChat, reason } = await canUserChat(userId, tirito);
 
-    const isCreator = userId.toString() === tirito.createdBy.toString();
+    const isCreator = userIdStr === creatorIdStr;
     let chat;
     let otherUserId = null;
 
@@ -154,14 +179,30 @@ const getChat = async (req, res, next) => {
         });
       }
 
-      if (!chat) {
+      if (!chat && canChat) {
         // Crear nuevo chat
-        chat = await Chat.create({
-          tiritoId,
-          participants: [tirito.createdBy, userId]
-        });
-        await chat.populate('participants', 'name email username');
+        // Si el tirito está en progreso, el chat es entre creador y worker asignado
+        // Si está abierto, el chat es entre creador y el usuario actual (solicitante)
+        const otherParticipant = tirito.status === 'in_progress' && tirito.assignedTo
+          ? (userIdStr === creatorIdStr ? tirito.assignedTo : tirito.createdBy)
+          : (userIdStr === creatorIdStr ? null : tirito.createdBy);
+
+        if (otherParticipant) {
+          chat = await Chat.create({
+            tiritoId,
+            participants: [tirito.createdBy, tirito.status === 'in_progress' ? tirito.assignedTo : userId]
+          });
+          await chat.populate('participants', 'name email username');
+        }
       }
+    }
+
+    // Si después de todo no hay chat, retornar error
+    if (!chat) {
+      return res.status(403).json({ 
+        message: 'No se pudo crear o encontrar el chat',
+        chatEnabled: false
+      });
     }
 
     // Obtener mensajes del chat
