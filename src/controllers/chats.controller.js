@@ -207,7 +207,7 @@ const getChat = async (req, res, next) => {
 
     // Obtener mensajes del chat
     const messages = await Message.find({ chatId: chat._id })
-      .populate('sender', 'name email username')
+      .populate('sender', '_id name email username')
       .sort({ createdAt: 1 });
 
     // Añadir info del título del tirito al chat response
@@ -253,21 +253,64 @@ const sendMessage = async (req, res, next) => {
 
     // Obtener datos del usuario que envía el mensaje
     const sender = await User.findById(userId).select('name username');
+    const creatorIdStr = tirito.createdBy._id ? tirito.createdBy._id.toString() : tirito.createdBy.toString();
+    const userIdStr = userId.toString();
 
-    // Buscar o crear chat
-    let chat = await Chat.findOne({
-      tiritoId,
-      participants: userId
-    });
+    // Determinar el otro participante del chat
+    let otherParticipantId;
+    if (userIdStr === creatorIdStr) {
+      // El creador envía: el otro es el worker asignado (si in_progress) o buscar solicitud
+      if (tirito.status === 'in_progress' && tirito.assignedTo) {
+        otherParticipantId = tirito.assignedTo._id ? tirito.assignedTo._id.toString() : tirito.assignedTo.toString();
+      } else {
+        // Buscar un chat existente donde el creador sea participante
+        const existingChat = await Chat.findOne({
+          tiritoId,
+          participants: { $all: [userId] }
+        });
+        if (existingChat) {
+          otherParticipantId = existingChat.participants.find(p => {
+            const pid = p._id ? p._id.toString() : p.toString();
+            return pid !== userIdStr;
+          });
+          if (otherParticipantId && otherParticipantId._id) {
+            otherParticipantId = otherParticipantId._id.toString();
+          } else if (otherParticipantId) {
+            otherParticipantId = otherParticipantId.toString();
+          }
+        }
+      }
+    } else {
+      // Un solicitante/worker envía: el otro es el creador
+      otherParticipantId = creatorIdStr;
+    }
+
+    // Buscar chat existente entre estos dos usuarios específicos
+    let chat = null;
+    if (otherParticipantId) {
+      chat = await Chat.findOne({
+        tiritoId,
+        participants: { $all: [userId, otherParticipantId] }
+      });
+    }
 
     const isNewChat = !chat;
 
-    if (!chat) {
+    if (!chat && otherParticipantId) {
+      chat = await Chat.create({
+        tiritoId,
+        participants: [creatorIdStr, otherParticipantId === creatorIdStr ? userId : otherParticipantId]
+      });
+    } else if (!chat) {
+      // Fallback: crear chat con creador y usuario actual
       chat = await Chat.create({
         tiritoId,
         participants: [tirito.createdBy, userId]
       });
     }
+
+    // Refrescar chat para obtener todos los participantes (importante para emitir socket)
+    chat = await Chat.findById(chat._id);
 
     // Crear mensaje
     const message = await Message.create({
@@ -276,19 +319,41 @@ const sendMessage = async (req, res, next) => {
       content: content.trim()
     });
 
-    await message.populate('sender', 'name email username');
+    await message.populate('sender', '_id name email username');
 
-    // Determinar quién recibe la notificación (el otro participante)
-    // Normalizar participantes a IDs (soporta ObjectId o documentos poblados)
-    let recipientId = null;
+    // Emitir mensaje por Socket.IO en tiempo real
+    const socketUtil = require('../utils/socket');
+    const io = socketUtil.getIO();
+    const logger = require('../utils/logger');
+    
+    // Obtener los IDs de participantes de forma segura
+    const participantIds = [];
     if (Array.isArray(chat.participants)) {
       for (const p of chat.participants) {
         const pid = p && p._id ? p._id.toString() : (p ? p.toString() : null);
-        if (pid && pid !== userId.toString()) {
-          recipientId = pid;
-          break;
+        if (pid) {
+          participantIds.push(pid);
         }
       }
+    }
+    
+    logger.info('Participantes del chat:', { participantIds, chatId: chat._id.toString() });
+    
+    // Determinar quién recibe la notificación (el otro participante)
+    const recipientId = participantIds.find(pid => pid !== userId.toString()) || null;
+
+    // Emitir el mensaje a todos los participantes del chat
+    if (io && participantIds.length > 0) {
+      logger.info('Emitiendo chat_message por Socket.IO', { chatId: chat._id.toString(), tiritoId, participantIds });
+      // Emitir a ambos participantes
+      participantIds.forEach(pid => {
+        logger.info('Socket emit chat_message', { room: `user_${pid}`, messageId: message._id.toString() });
+        io.to(`user_${pid}`).emit('chat_message', {
+          chatId: chat._id.toString(),
+          tiritoId: tiritoId,
+          message: message
+        });
+      });
     }
 
     // Crear notificación para el receptor
