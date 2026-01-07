@@ -33,18 +33,28 @@ module.exports = {
           metrics.inc('socket_connections', 1);
           logger.info('Socket conectado', { id: socket.id, userId: socket.userId || null });
 
-          // Auto-join to user room if authenticated
+          // Auto-join to user room if authenticated (only if not already in)
           if (socket.userId) {
-            socket.join(`user_${socket.userId}`);
-            logger.info('Socket joined room', { socketId: socket.id, room: `user_${socket.userId}` });
+            const room = `user_${socket.userId}`;
+            const alreadyIn = (socket.rooms && socket.rooms.has && socket.rooms.has(room)) || Array.from(socket.rooms || []).includes(room);
+            if (!alreadyIn) {
+              socket.join(room);
+              logger.info('Socket joined room', { socketId: socket.id, room });
+            }
           }
 
           // Fallback: allow manual register event (but still validate)
           socket.on('register', (userId) => {
             const uid = userId && (userId._id || userId.id) ? (userId._id || userId.id) : userId;
             if (uid) {
-              socket.join(`user_${uid}`);
-              logger.info('Socket joined room via register', { socketId: socket.id, room: `user_${uid}` });
+              const room = `user_${uid}`;
+              const alreadyIn = (socket.rooms && socket.rooms.has && socket.rooms.has(room)) || Array.from(socket.rooms || []).includes(room);
+              if (!alreadyIn) {
+                socket.join(room);
+                logger.info('Socket joined room via register', { socketId: socket.id, room });
+              } else {
+                logger.info('Socket already in room, skipping join', { socketId: socket.id, room });
+              }
             }
           });
 
