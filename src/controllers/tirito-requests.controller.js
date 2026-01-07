@@ -51,11 +51,9 @@ const createRequest = async (req, res, next) => {
       type: 'tirito_request',
       title: 'Nueva solicitud de tirito',
       message: `${request.requester.name} quiere hacer tu tirito "${tirito.title}"`,
-      data: {
-        tiritoId: tirito._id,
-        requestId: request._id,
-        requesterId: requesterId
-      }
+      fromUserId: requesterId,
+      tiritoId: tirito._id,
+      actionUrl: `/solicitudes`
     });
 
     if (io) {
@@ -204,10 +202,9 @@ const acceptRequest = async (req, res, next) => {
       type: 'request_accepted',
       title: '¡Solicitud aceptada!',
       message: `Tu solicitud para "${tirito.title}" fue aceptada. ¡A trabajar!`,
-      data: {
-        tiritoId: tirito._id,
-        requestId: request._id
-      }
+      fromUserId: userId,
+      tiritoId: tirito._id,
+      actionUrl: `/tiritos/${tirito._id}`
     });
 
     if (io) {
@@ -260,10 +257,9 @@ const rejectRequest = async (req, res, next) => {
       type: 'request_rejected',
       title: 'Solicitud rechazada',
       message: `Tu solicitud para "${request.tirito.title}" fue rechazada.`,
-      data: {
-        tiritoId: request.tirito._id,
-        requestId: request._id
-      }
+      fromUserId: userId,
+      tiritoId: request.tirito._id,
+      actionUrl: `/tiritos`
     });
 
     if (io) {

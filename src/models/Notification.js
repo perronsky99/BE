@@ -6,6 +6,9 @@ const mongoose = require('mongoose');
  * - chat_new: Alguien te contactó por un tirito
  * - chat_message: Nuevo mensaje en un chat existente
  * - tirito_interest: Alguien mostró interés en tu tirito
+ * - tirito_request: Solicitud para hacer un tirito
+ * - request_accepted: Solicitud de tirito aceptada
+ * - request_rejected: Solicitud de tirito rechazada
  */
 const notificationSchema = new mongoose.Schema({
   // Usuario que recibe la notificación
@@ -18,7 +21,7 @@ const notificationSchema = new mongoose.Schema({
   // Tipo de notificación
   type: {
     type: String,
-    enum: ['chat_new', 'chat_message', 'tirito_interest'],
+    enum: ['chat_new', 'chat_message', 'tirito_interest', 'tirito_request', 'request_accepted', 'request_rejected'],
     required: true
   },
   // Título de la notificación
