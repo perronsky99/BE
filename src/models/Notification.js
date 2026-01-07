@@ -21,7 +21,7 @@ const notificationSchema = new mongoose.Schema({
   // Tipo de notificación
   type: {
     type: String,
-    enum: ['chat_new', 'chat_message', 'tirito_interest', 'tirito_request', 'request_accepted', 'request_rejected'],
+    enum: ['chat_new', 'chat_message', 'tirito_status', 'tirito_request', 'request_accepted', 'request_rejected', 'rating_request', 'system'],
     required: true
   },
   // Título de la notificación
