@@ -20,7 +20,7 @@ const getChat = async (req, res, next) => {
     let chat = await Chat.findOne({
       tiritoId,
       participants: userId
-    }).populate('participants', 'name email');
+    }).populate('participants', 'name email username');
 
     if (!chat) {
       // Crear nuevo chat
@@ -28,12 +28,12 @@ const getChat = async (req, res, next) => {
         tiritoId,
         participants: [tirito.createdBy, userId]
       });
-      await chat.populate('participants', 'name email');
+      await chat.populate('participants', 'name email username');
     }
 
     // Obtener mensajes del chat
     const messages = await Message.find({ chatId: chat._id })
-      .populate('sender', 'name email')
+      .populate('sender', 'name email username')
       .sort({ createdAt: 1 });
 
     res.json({
@@ -63,7 +63,7 @@ const sendMessage = async (req, res, next) => {
     }
 
     // Obtener datos del usuario que envía el mensaje
-    const sender = await User.findById(userId).select('name');
+    const sender = await User.findById(userId).select('name username');
 
     // Buscar o crear chat
     let chat = await Chat.findOne({
@@ -87,7 +87,7 @@ const sendMessage = async (req, res, next) => {
       content: content.trim()
     });
 
-    await message.populate('sender', 'name email');
+    await message.populate('sender', 'name email username');
 
     // Determinar quién recibe la notificación (el otro participante)
     // Normalizar participantes a IDs (soporta ObjectId o documentos poblados)
@@ -105,9 +105,10 @@ const sendMessage = async (req, res, next) => {
     // Crear notificación para el receptor
     if (recipientId) {
       const notificationType = isNewChat ? 'chat_new' : 'chat_message';
+      const senderLabel = sender?.username ? sender.username : (sender?.name || 'Alguien');
       const notificationTitle = isNewChat 
-        ? `${sender?.name || 'Alguien'} te contactó`
-        : `Nuevo mensaje de ${sender?.name || 'alguien'}`;
+        ? `${senderLabel} te contactó`
+        : `Nuevo mensaje de ${senderLabel}`;
       const notificationMessage = isNewChat
         ? `Alguien está interesado en tu tirito "${tirito.title}"`
         : content.trim().substring(0, 100);
@@ -140,7 +141,7 @@ const getMyChats = async (req, res, next) => {
     const userId = req.user.id;
 
     const chats = await Chat.find({ participants: userId })
-      .populate('participants', 'name email')
+      .populate('participants', 'name email username')
       .populate('tiritoId', 'title status')
       .sort({ createdAt: -1 });
 
