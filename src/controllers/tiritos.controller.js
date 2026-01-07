@@ -1,7 +1,20 @@
 const Tirito = require('../models/Tirito');
 
 /**
+ * Obtiene las iniciales de un nombre o username
+ */
+const getInitials = (name) => {
+  if (!name) return '??';
+  const parts = name.split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
+
+/**
  * Transforma un tirito de MongoDB al formato esperado por el frontend
+ * Usa username (alias) en lugar del nombre real por privacidad
  */
 const transformTirito = (tirito, baseUrl = '') => ({
   id: tirito._id.toString(),
@@ -14,10 +27,14 @@ const transformTirito = (tirito, baseUrl = '') => ({
     thumbnailUrl: img && img.startsWith('http') ? img : `${baseUrl}${img}`
   })),
   creatorId: tirito.createdBy?._id?.toString() || tirito.createdBy?.toString(),
-  creatorName: tirito.createdBy?.name || 'Usuario',
+  // Usar username (alias) en lugar del nombre real
+  creatorName: tirito.createdBy?.username || 'Usuario',
+  creatorInitials: getInitials(tirito.createdBy?.username || tirito.createdBy?.name),
   creatorAvatar: null,
   assignedTo: tirito.assignedTo ? (tirito.assignedTo._id ? tirito.assignedTo._id.toString() : tirito.assignedTo.toString()) : null,
-  assignedToName: tirito.assignedTo?.name || null,
+  // Usar username (alias) para el asignado también
+  assignedToName: tirito.assignedTo?.username || null,
+  assignedToInitials: tirito.assignedTo ? getInitials(tirito.assignedTo?.username || tirito.assignedTo?.name) : null,
   location: tirito.location || null,
   createdAt: tirito.createdAt,
   updatedAt: tirito.updatedAt || tirito.createdAt
@@ -49,8 +66,8 @@ const getTiritos = async (req, res, next) => {
 
     const total = await Tirito.countDocuments(filter);
     const tiritos = await Tirito.find(filter)
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email username')
+      .populate('assignedTo', 'name email username')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -72,8 +89,8 @@ const getTiritos = async (req, res, next) => {
 const getTiritoById = async (req, res, next) => {
   try {
     const tirito = await Tirito.findById(req.params.id)
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email');
+      .populate('createdBy', 'name email username')
+      .populate('assignedTo', 'name email username');
 
     if (!tirito) {
       return res.status(404).json({ message: 'Tirito no encontrado' });
@@ -121,7 +138,7 @@ const createTirito = async (req, res, next) => {
       createdBy: userId
     });
 
-    await tirito.populate('createdBy', 'name email');
+    await tirito.populate('createdBy', 'name email username');
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.status(201).json({
@@ -187,8 +204,8 @@ const updateTiritoStatus = async (req, res, next) => {
       return res.status(403).json({ message: 'No tenés permiso para modificar este tirito' });
     }
 
-    await tirito.populate('createdBy', 'name email');
-    await tirito.populate('assignedTo', 'name email');
+    await tirito.populate('createdBy', 'name email username');
+    await tirito.populate('assignedTo', 'name email username');
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
@@ -204,8 +221,8 @@ const updateTiritoStatus = async (req, res, next) => {
 const getMyTiritos = async (req, res, next) => {
   try {
     const tiritos = await Tirito.find({ createdBy: req.user.id })
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email username')
+      .populate('assignedTo', 'name email username')
       .sort({ createdAt: -1 });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -232,8 +249,8 @@ const getTiritosByCreator = async (req, res, next) => {
 
     const total = await Tirito.countDocuments(filter);
     const tiritos = await Tirito.find(filter)
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email username')
+      .populate('assignedTo', 'name email username')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));

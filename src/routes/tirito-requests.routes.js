@@ -4,6 +4,7 @@ const {
   createRequest,
   getMyRequests,
   getMySentRequests,
+  getMyRequestForTirito,
   acceptRequest,
   rejectRequest,
   getPendingCount
@@ -21,6 +22,9 @@ router.get('/sent', getMySentRequests);
 
 // GET /api/tirito-requests/count - Contar pendientes (para badge)
 router.get('/count', getPendingCount);
+
+// GET /api/tirito-requests/tirito/:tiritoId/mine - Mi solicitud para un tirito específico
+router.get('/tirito/:tiritoId/mine', getMyRequestForTirito);
 
 // POST /api/tirito-requests - Crear solicitud
 router.post('/', createRequest);

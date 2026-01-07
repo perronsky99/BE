@@ -1,7 +1,37 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
+/**
+ * Genera un username único basado en adjetivo + sustantivo + número
+ */
+const generateUsername = () => {
+  const adjectives = [
+    'Veloz', 'Amable', 'Genial', 'Astuto', 'Valiente', 'Noble', 'Sabio', 'Alegre',
+    'Audaz', 'Brillante', 'Calmo', 'Diestro', 'Eficaz', 'Firme', 'Gentil', 'Habil',
+    'Leal', 'Rapido', 'Sereno', 'Tenaz', 'Unico', 'Vivaz', 'Agil', 'Bravo'
+  ];
+  const nouns = [
+    'Halcon', 'Delfin', 'Tigre', 'Aguila', 'Lobo', 'Leon', 'Oso', 'Zorro',
+    'Puma', 'Jaguar', 'Condor', 'Dragon', 'Fenix', 'Grifo', 'Pegaso', 'Rayo',
+    'Viento', 'Sol', 'Luna', 'Estrella', 'Cometa', 'Trueno', 'Fuego', 'Cristal'
+  ];
+  
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const num = Math.floor(Math.random() * 9000) + 1000; // 4 dígitos
+  
+  return `${adj}${noun}${num}`;
+};
+
 const userSchema = new mongoose.Schema({
+  // Username público (alias) - generado automáticamente
+  username: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   name: {
     type: String,
     required: [true, 'El nombre es requerido'],
@@ -36,8 +66,22 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Hash password antes de guardar
+// Generar username antes de guardar si no tiene
 userSchema.pre('save', async function(next) {
+  // Generar username si no tiene
+  if (!this.username) {
+    let username = generateUsername();
+    let exists = await mongoose.model('User').findOne({ username });
+    let attempts = 0;
+    while (exists && attempts < 10) {
+      username = generateUsername();
+      exists = await mongoose.model('User').findOne({ username });
+      attempts++;
+    }
+    this.username = username;
+  }
+  
+  // Hash password si fue modificado
   if (!this.isModified('password')) return next();
   
   const salt = await bcrypt.genSalt(10);

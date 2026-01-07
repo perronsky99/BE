@@ -12,7 +12,7 @@ const createRequest = async (req, res, next) => {
     const requesterId = req.user.id;
 
     // Validar tirito existe y está abierto
-    const tirito = await Tirito.findById(tiritoId).populate('createdBy', 'name');
+    const tirito = await Tirito.findById(tiritoId).populate('createdBy', 'name username');
     if (!tirito) {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
@@ -93,7 +93,7 @@ const getMyRequests = async (req, res, next) => {
       status: 'pending'
     })
       .populate('tirito', 'title description images')
-      .populate('requester', 'name email')
+      .populate('requester', 'name email username')
       .sort({ createdAt: -1 });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -108,8 +108,9 @@ const getMyRequests = async (req, res, next) => {
         },
         requester: {
           id: r.requester._id,
-          name: r.requester.name,
-          email: r.requester.email
+          // Usar username (alias) en lugar del nombre real
+          name: r.requester.username || r.requester.name,
+          username: r.requester.username
         },
         message: r.message,
         status: r.status,
@@ -147,6 +148,37 @@ const getMySentRequests = async (req, res, next) => {
         createdAt: r.createdAt
       })),
       total: requests.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/tirito-requests/tirito/:tiritoId/mine
+ * Obtener mi solicitud para un tirito específico (si existe)
+ */
+const getMyRequestForTirito = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { tiritoId } = req.params;
+
+    const request = await TiritoRequest.findOne({ 
+      tirito: tiritoId, 
+      requester: userId 
+    });
+
+    if (!request) {
+      return res.json({ request: null });
+    }
+
+    res.json({
+      request: {
+        id: request._id,
+        status: request.status,
+        message: request.message,
+        createdAt: request.createdAt
+      }
     });
   } catch (err) {
     next(err);
@@ -301,6 +333,7 @@ module.exports = {
   createRequest,
   getMyRequests,
   getMySentRequests,
+  getMyRequestForTirito,
   acceptRequest,
   rejectRequest,
   getPendingCount
