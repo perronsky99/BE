@@ -3,15 +3,15 @@ const Tirito = require('../models/Tirito');
 /**
  * Transforma un tirito de MongoDB al formato esperado por el frontend
  */
-const transformTirito = (tirito) => ({
+const transformTirito = (tirito, baseUrl = '') => ({
   id: tirito._id.toString(),
   title: tirito.title,
   description: tirito.description,
   status: tirito.status,
   images: (tirito.images || []).map((img, idx) => ({
     id: `${tirito._id}-${idx}`,
-    url: img,
-    thumbnailUrl: img
+    url: img && img.startsWith('http') ? img : `${baseUrl}${img}`,
+    thumbnailUrl: img && img.startsWith('http') ? img : `${baseUrl}${img}`
   })),
   creatorId: tirito.createdBy?._id?.toString() || tirito.createdBy?.toString(),
   creatorName: tirito.createdBy?.name || 'Usuario',
@@ -52,8 +52,9 @@ const getTiritos = async (req, res, next) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
-      data: tiritos.map(transformTirito),
+      data: tiritos.map(t => transformTirito(t, baseUrl)),
       total,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -74,7 +75,8 @@ const getTiritoById = async (req, res, next) => {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
 
-    res.json(transformTirito(tirito));
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json(transformTirito(tirito, baseUrl));
   } catch (error) {
     next(error);
   }
@@ -114,9 +116,10 @@ const createTirito = async (req, res, next) => {
 
     await tirito.populate('createdBy', 'name email');
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.status(201).json({
       message: 'Tirito creado correctamente',
-      tirito: transformTirito(tirito)
+      tirito: transformTirito(tirito, baseUrl)
     });
   } catch (error) {
     next(error);
@@ -150,9 +153,10 @@ const updateTiritoStatus = async (req, res, next) => {
 
     await tirito.populate('createdBy', 'name email');
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
       message: 'Status actualizado',
-      tirito: transformTirito(tirito)
+      tirito: transformTirito(tirito, baseUrl)
     });
   } catch (error) {
     next(error);
@@ -166,8 +170,9 @@ const getMyTiritos = async (req, res, next) => {
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
-      data: tiritos.map(transformTirito),
+      data: tiritos.map(t => transformTirito(t, baseUrl)),
       total: tiritos.length,
       page: 1,
       limit: tiritos.length,
@@ -194,8 +199,9 @@ const getTiritosByCreator = async (req, res, next) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
-      data: tiritos.map(transformTirito),
+      data: tiritos.map(t => transformTirito(t, baseUrl)),
       total,
       page: parseInt(page),
       limit: parseInt(limit),
