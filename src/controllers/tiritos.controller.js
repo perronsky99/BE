@@ -16,6 +16,8 @@ const transformTirito = (tirito, baseUrl = '') => ({
   creatorId: tirito.createdBy?._id?.toString() || tirito.createdBy?.toString(),
   creatorName: tirito.createdBy?.name || 'Usuario',
   creatorAvatar: null,
+  assignedTo: tirito.assignedTo ? (tirito.assignedTo._id ? tirito.assignedTo._id.toString() : tirito.assignedTo.toString()) : null,
+  assignedToName: tirito.assignedTo?.name || null,
   location: tirito.location || null,
   createdAt: tirito.createdAt,
   updatedAt: tirito.updatedAt || tirito.createdAt
@@ -48,6 +50,7 @@ const getTiritos = async (req, res, next) => {
     const total = await Tirito.countDocuments(filter);
     const tiritos = await Tirito.find(filter)
       .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -69,7 +72,8 @@ const getTiritos = async (req, res, next) => {
 const getTiritoById = async (req, res, next) => {
   try {
     const tirito = await Tirito.findById(req.params.id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email');
 
     if (!tirito) {
       return res.status(404).json({ message: 'Tirito no encontrado' });
@@ -133,7 +137,14 @@ const createTirito = async (req, res, next) => {
 const updateTiritoStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.id.toString();
+
+    console.log('[updateTiritoStatus] Request:', {
+      tiritoId: req.params.id,
+      newStatus: status,
+      userId,
+      userIdType: typeof userId
+    });
 
     // Validar status
     if (!['open', 'in_progress', 'closed'].includes(status)) {
@@ -146,26 +157,38 @@ const updateTiritoStatus = async (req, res, next) => {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
 
+    const creatorId = tirito.createdBy.toString();
+    const isCreator = creatorId === userId;
+
+    console.log('[updateTiritoStatus] Permissions:', {
+      creatorId,
+      userId,
+      isCreator,
+      currentStatus: tirito.status
+    });
+
     // Lógica de permisos:
-    // - Si se intenta marcar `in_progress` y quien hace la petición NO es el creador,
-    //   lo permitimos y registramos a `assignedTo` como quien acepta el trabajo.
-    // - Para cambios de status distintos a `in_progress`, solo el creador puede hacerlo.
-    if (status === 'in_progress' && tirito.createdBy.toString() !== userId.toString()) {
+    // - Cualquier usuario autenticado puede "tomar" un tirito abierto (marcar in_progress)
+    // - Solo el creador puede cerrar o reabrir su propio tirito
+    if (status === 'in_progress' && !isCreator && tirito.status === 'open') {
+      // Otro usuario toma el trabajo
       tirito.status = 'in_progress';
       tirito.assignedTo = userId;
       await tirito.save();
-    } else {
-      // Verificar ownership - solo el creador puede cambiar estos estados
-      if (tirito.createdBy.toString() !== userId.toString()) {
-        return res.status(403).json({ message: 'No tenés permiso para modificar este tirito' });
-      }
-
+      console.log('[updateTiritoStatus] Tirito taken by:', userId);
+    } else if (isCreator) {
+      // El creador puede cambiar cualquier estado de su tirito
       tirito.status = status;
-      // If closing, keep assignedTo as-is
       await tirito.save();
+      console.log('[updateTiritoStatus] Creator updated status to:', status);
+    } else {
+      // No tiene permisos
+      console.log('[updateTiritoStatus] Permission denied');
+      return res.status(403).json({ message: 'No tenés permiso para modificar este tirito' });
     }
 
     await tirito.populate('createdBy', 'name email');
+    await tirito.populate('assignedTo', 'name email');
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
@@ -182,6 +205,7 @@ const getMyTiritos = async (req, res, next) => {
   try {
     const tiritos = await Tirito.find({ createdBy: req.user.id })
       .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email')
       .sort({ createdAt: -1 });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -209,6 +233,7 @@ const getTiritosByCreator = async (req, res, next) => {
     const total = await Tirito.countDocuments(filter);
     const tiritos = await Tirito.find(filter)
       .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
