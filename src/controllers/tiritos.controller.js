@@ -85,6 +85,9 @@ const getTiritoById = async (req, res, next) => {
 // POST /api/tiritos
 const createTirito = async (req, res, next) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
     const userId = req.user.id;
 
     // REGLA CLAVE: Verificar si ya tiene un tirito activo
