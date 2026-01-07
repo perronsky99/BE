@@ -23,6 +23,11 @@ const tiritoSchema = new mongoose.Schema({
     },
     default: []
   },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   status: {
     type: String,
     enum: ['open', 'in_progress', 'closed'],

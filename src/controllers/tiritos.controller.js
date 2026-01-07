@@ -143,13 +143,24 @@ const updateTiritoStatus = async (req, res, next) => {
       return res.status(404).json({ message: 'Tirito no encontrado' });
     }
 
-    // Verificar ownership - solo el creador puede cambiar el status
-    if (tirito.createdBy.toString() !== userId.toString()) {
-      return res.status(403).json({ message: 'No tenés permiso para modificar este tirito' });
-    }
+    // Lógica de permisos:
+    // - Si se intenta marcar `in_progress` y quien hace la petición NO es el creador,
+    //   lo permitimos y registramos a `assignedTo` como quien acepta el trabajo.
+    // - Para cambios de status distintos a `in_progress`, solo el creador puede hacerlo.
+    if (status === 'in_progress' && tirito.createdBy.toString() !== userId.toString()) {
+      tirito.status = 'in_progress';
+      tirito.assignedTo = userId;
+      await tirito.save();
+    } else {
+      // Verificar ownership - solo el creador puede cambiar estos estados
+      if (tirito.createdBy.toString() !== userId.toString()) {
+        return res.status(403).json({ message: 'No tenés permiso para modificar este tirito' });
+      }
 
-    tirito.status = status;
-    await tirito.save();
+      tirito.status = status;
+      // If closing, keep assignedTo as-is
+      await tirito.save();
+    }
 
     await tirito.populate('createdBy', 'name email');
 

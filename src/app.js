@@ -9,6 +9,7 @@ const tiritosRoutes = require('./routes/tiritos.routes');
 const chatsRoutes = require('./routes/chats.routes');
 const notificationsRoutes = require('./routes/notifications.routes');
 const profilesRoutes = require('./routes/profiles.routes');
+const ratingsRoutes = require('./routes/ratings.routes');
 
 // Middleware de errores
 const errorHandler = require('./middlewares/error.middleware');
@@ -41,6 +42,7 @@ app.use('/api/tiritos', tiritosRoutes);
 app.use('/api/chats', chatsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/profiles', profilesRoutes);
+app.use('/api/ratings', ratingsRoutes);
 
 // Ruta 404
 app.use((req, res) => {
