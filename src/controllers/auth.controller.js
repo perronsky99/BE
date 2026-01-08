@@ -4,11 +4,43 @@ const { generateToken } = require('../utils/jwt');
 // POST /api/auth/register
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { 
+      firstName, 
+      lastName, 
+      documentType, 
+      documentNumber, 
+      birthDate,
+      estado,
+      municipio,
+      direccion,
+      phoneMobile,
+      phoneLocal,
+      email, 
+      password, 
+      role,
+      // Campo legacy para compatibilidad
+      name: legacyName
+    } = req.body;
 
     // Validar campos requeridos
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Nombre, email y contraseña son requeridos' });
+    if (!firstName || !lastName || !email || !password) {
+      return res.status(400).json({ message: 'Nombres, apellidos, email y contraseña son requeridos' });
+    }
+
+    if (!documentType || !documentNumber) {
+      return res.status(400).json({ message: 'Tipo y número de documento son requeridos' });
+    }
+
+    if (!birthDate) {
+      return res.status(400).json({ message: 'La fecha de nacimiento es requerida' });
+    }
+
+    if (!estado || !municipio || !direccion) {
+      return res.status(400).json({ message: 'Estado, municipio y dirección son requeridos' });
+    }
+
+    if (!phoneMobile) {
+      return res.status(400).json({ message: 'El teléfono celular es requerido' });
     }
 
     // Verificar si el email ya existe
@@ -17,9 +49,24 @@ const register = async (req, res, next) => {
       return res.status(400).json({ message: 'El email ya está registrado' });
     }
 
+    // Verificar si la cédula ya existe
+    const existingDocument = await User.findOne({ documentNumber });
+    if (existingDocument) {
+      return res.status(400).json({ message: 'La cédula ya está registrada' });
+    }
+
     // Crear usuario
     const user = await User.create({
-      name,
+      firstName,
+      lastName,
+      documentType,
+      documentNumber,
+      birthDate: new Date(birthDate),
+      estado,
+      municipio,
+      direccion,
+      phoneMobile,
+      phoneLocal: phoneLocal || null,
       email,
       password,
       role: role || 'user'
@@ -32,6 +79,8 @@ const register = async (req, res, next) => {
       message: 'Usuario registrado correctamente',
       user: {
         id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
         name: user.name,
         username: user.username,
         email: user.email,

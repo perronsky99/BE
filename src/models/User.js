@@ -32,9 +32,60 @@ const userSchema = new mongoose.Schema({
     trim: true,
     index: true
   },
-  name: {
+  // Datos personales
+  firstName: {
     type: String,
     required: [true, 'El nombre es requerido'],
+    trim: true
+  },
+  lastName: {
+    type: String,
+    required: [true, 'El apellido es requerido'],
+    trim: true
+  },
+  // Documento de identidad
+  documentType: {
+    type: String,
+    enum: ['V', 'E'],
+    required: [true, 'El tipo de documento es requerido']
+  },
+  documentNumber: {
+    type: String,
+    required: [true, 'La cédula es requerida'],
+    unique: true,
+    trim: true
+  },
+  birthDate: {
+    type: Date,
+    required: [true, 'La fecha de nacimiento es requerida']
+  },
+  // Ubicación
+  estado: {
+    type: String,
+    required: [true, 'El estado es requerido']
+  },
+  municipio: {
+    type: String,
+    required: [true, 'El municipio es requerido']
+  },
+  direccion: {
+    type: String,
+    required: [true, 'La dirección es requerida'],
+    trim: true
+  },
+  // Teléfonos
+  phoneMobile: {
+    type: String,
+    required: [true, 'El teléfono celular es requerido'],
+    trim: true
+  },
+  phoneLocal: {
+    type: String,
+    trim: true
+  },
+  // Campo legacy para compatibilidad (nombre completo)
+  name: {
+    type: String,
     trim: true
   },
   email: {
@@ -79,6 +130,11 @@ userSchema.pre('save', async function(next) {
       attempts++;
     }
     this.username = username;
+  }
+  
+  // Generar nombre completo para compatibilidad
+  if (this.firstName && this.lastName) {
+    this.name = `${this.firstName} ${this.lastName}`;
   }
   
   // Hash password si fue modificado
