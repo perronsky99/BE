@@ -219,7 +219,8 @@ const getChat = async (req, res, next) => {
       messages,
       chatEnabled: canChat,
       chatDisabledReason: reason,
-      tiritoStatus: tirito.status
+      tiritoStatus: tirito.status,
+      tiritoCreatorId: tirito.createdBy._id ? tirito.createdBy._id.toString() : tirito.createdBy.toString()
     });
   } catch (error) {
     next(error);
