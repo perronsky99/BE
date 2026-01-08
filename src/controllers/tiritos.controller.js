@@ -291,12 +291,44 @@ const canCreateTirito = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/tiritos/shared/:userId
+ * Verifica si existe al menos un tirito compartido (in_progress o closed)
+ * entre el usuario actual y otro usuario.
+ * Esto se usa para determinar si se pueden mostrar datos sensibles del perfil.
+ */
+const checkSharedTiritos = async (req, res, next) => {
+  try {
+    const currentUserId = req.user.id;
+    const otherUserId = req.params.userId;
+
+    // Buscar tiritos donde:
+    // - El usuario actual es creador Y el otro es asignado, O
+    // - El usuario actual es asignado Y el otro es creador
+    // Y el estado es 'in_progress' o 'closed'
+    const sharedTirito = await Tirito.findOne({
+      $or: [
+        { createdBy: currentUserId, assignedTo: otherUserId },
+        { createdBy: otherUserId, assignedTo: currentUserId }
+      ],
+      status: { $in: ['in_progress', 'closed'] }
+    });
+
+    res.json({
+      hasSharedTiritos: !!sharedTirito
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getTiritos,
   getTiritoById,
   createTirito,
   updateTiritoStatus,
   getMyTiritos,
-  canCreateTirito
-  ,getTiritosByCreator
+  canCreateTirito,
+  getTiritosByCreator,
+  checkSharedTiritos
 };

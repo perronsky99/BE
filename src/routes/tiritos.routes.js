@@ -7,7 +7,8 @@ const {
   updateTiritoStatus,
   getMyTiritos,
   canCreateTirito,
-  getTiritosByCreator
+  getTiritosByCreator,
+  checkSharedTiritos
 } = require('../controllers/tiritos.controller');
 const auth = require('../middlewares/auth.middleware');
 const upload = require('../utils/upload');
@@ -31,6 +32,9 @@ router.get('/me', getMyTiritos);
 
 // GET /api/tiritos/can-create - Verificar si puede crear
 router.get('/can-create', canCreateTirito);
+
+// GET /api/tiritos/shared/:userId - Verificar si hay tiritos compartidos con otro usuario
+router.get('/shared/:userId', checkSharedTiritos);
 
 // GET /api/tiritos/:id - Detalle de un tirito
 router.get('/:id', getTiritoById);

@@ -19,20 +19,37 @@ const getInitials = (name) => {
 
 /**
  * Transforma usuario DB a objeto público para frontend
- * Usa username (alias) para proteger identidad real
+ * Incluye datos públicos y datos sensibles (el frontend decide qué mostrar)
  */
 const transformPublicUser = (user) => ({
   id: user._id.toString(),
   // Username es el alias público
   username: user.username,
-  // No exponemos el nombre real en perfiles públicos
+  // Nombre completo generado
   name: user.username || user.name,
   initials: getInitials(user.username || user.name),
-  // No exponemos email en perfiles públicos
   role: user.role,
   verificationStatus: user.verificationStatus,
   avatar: user.avatar || null,
-  createdAt: user.createdAt
+  bio: user.bio || null,
+  createdAt: user.createdAt,
+  
+  // Datos personales (el frontend decide si mostrarlos según permisos)
+  firstName: user.firstName || null,
+  lastName: user.lastName || null,
+  
+  // Ubicación general (público)
+  estado: user.estado || null,
+  municipio: user.municipio || null,
+  
+  // Datos sensibles (el frontend los oculta hasta que haya trabajo aceptado)
+  documentType: user.documentType || null,
+  documentNumber: user.documentNumber || null,
+  birthDate: user.birthDate || null,
+  direccion: user.direccion || null,
+  phoneMobile: user.phoneMobile || null,
+  phoneLocal: user.phoneLocal || null,
+  email: user.email || null
 });
 
 // GET /api/profiles/:id  (público)
