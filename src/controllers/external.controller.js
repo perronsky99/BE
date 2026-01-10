@@ -59,16 +59,24 @@ const cedulaLookup = (req, res, next) => {
           }
 
           if (full) {
-            const parts = full.replace(/\s+/g, ' ').split(' ');
+            const parts = full.replace(/\s+/g, ' ').trim().split(' ');
+            // partículas comunes que forman parte del apellido compuesto
+            const particles = ['DE','DEL','LA','LAS','LOS','Y','VAN','VON','MC','MAC','SAN','SANTA'];
             if (parts.length === 1) {
               firstName = parts[0];
             } else if (parts.length === 2) {
               firstName = parts[0];
               lastName = parts[1];
             } else {
-              // Asumir últimas 2 palabras como apellidos cuando hay >=3 palabras
-              lastName = parts.slice(-2).join(' ');
-              firstName = parts.slice(0, -2).join(' ');
+              // Por defecto tomar las últimas 2 palabras como apellido
+              let lastParts = parts.slice(-2);
+              // Si la palabra anterior a esas es una partícula, incluirla
+              const maybeParticle = parts[parts.length - 3] ? parts[parts.length - 3].toUpperCase() : '';
+              if (particles.includes(maybeParticle)) {
+                lastParts = parts.slice(-3);
+              }
+              lastName = lastParts.join(' ');
+              firstName = parts.slice(0, parts.length - lastParts.length).join(' ');
             }
           }
         } catch (e) {
@@ -76,7 +84,36 @@ const cedulaLookup = (req, res, next) => {
         }
 
         const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-        const result = { firstName: firstName || '', lastName: lastName || '', fullName: fullName || '', id: cedulaKey };
+        // Extract birthDate and gender if present in the page
+        let birthDate = '';
+        let gender = '';
+        try {
+          const $ = cheerio.load(data);
+          // Fecha de Nacimiento
+          const birthEl = $('h5.info-card-title').filter((i, el) => /fecha de nacimiento/i.test($(el).text())).first();
+          if (birthEl && birthEl.length) {
+            const txt = $(birthEl).next('p.info-card-text').text().trim() || '';
+            // expected like '17-09-1985 (40)'
+            const m = txt.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/);
+            if (m) {
+              const [d, mth, y] = m[1].split(/[-\/]/);
+              // normalize to YYYY-MM-DD
+              birthDate = `${y}-${String(mth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            }
+          }
+          // Género
+          const genEl = $('h5.info-card-title').filter((i, el) => /género|genero/i.test($(el).text())).first();
+          if (genEl && genEl.length) {
+            const gtxt = $(genEl).next('p.info-card-text').text().trim();
+            if (gtxt) {
+              gender = gtxt.toUpperCase();
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        const result = { firstName: firstName || '', lastName: lastName || '', fullName: fullName || '', id: cedulaKey, birthDate: birthDate || '', gender: gender || '' };
         // Include raw HTML only when explicitly requested (debug=1)
         const includeRaw = req.query && (req.query.debug === '1' || req.query.debug === 'true');
         if (includeRaw) {
