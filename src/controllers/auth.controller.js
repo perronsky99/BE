@@ -18,6 +18,7 @@ const register = async (req, res, next) => {
       email, 
       password, 
       role,
+      bio,
       // Campo legacy para compatibilidad
       name: legacyName
     } = req.body;
@@ -69,7 +70,8 @@ const register = async (req, res, next) => {
       phoneLocal: phoneLocal || null,
       email,
       password,
-      role: role || 'user'
+      role: role || 'user',
+      bio: bio || null
     });
 
     // Generar token
@@ -77,7 +79,7 @@ const register = async (req, res, next) => {
 
     res.status(201).json({
       message: 'Usuario registrado correctamente',
-      user: {
+        user: {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -85,6 +87,7 @@ const register = async (req, res, next) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        bio: user.bio || null,
         verificationStatus: user.verificationStatus
       },
       token
@@ -126,6 +129,7 @@ const login = async (req, res, next) => {
       user: {
         id: user._id,
         name: user.name,
+        bio: user.bio || null,
         username: user.username,
         email: user.email,
         role: user.role,

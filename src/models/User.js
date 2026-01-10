@@ -88,6 +88,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Descripción pública / Acerca de
+  bio: {
+    type: String,
+    trim: true,
+    maxlength: [1000, 'La biografía no puede exceder 1000 caracteres'],
+    default: null
+  },
   email: {
     type: String,
     required: [true, 'El email es requerido'],

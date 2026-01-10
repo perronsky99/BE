@@ -15,6 +15,7 @@ const getMe = async (req, res, next) => {
         firstName: user.firstName,
         lastName: user.lastName,
         name: user.name,
+        bio: user.bio || null,
         email: user.email,
         role: user.role,
         verificationStatus: user.verificationStatus,
@@ -43,6 +44,7 @@ const updateMe = async (req, res, next) => {
     // Solo permitir actualizar el nombre
     const updates = {};
     if (name) updates.name = name;
+    if (req.body.bio !== undefined) updates.bio = req.body.bio;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
@@ -59,6 +61,7 @@ const updateMe = async (req, res, next) => {
       user: {
         id: user._id,
         name: user.name,
+        bio: user.bio || null,
         email: user.email,
         role: user.role,
         verificationStatus: user.verificationStatus
