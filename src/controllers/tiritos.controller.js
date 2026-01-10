@@ -121,7 +121,7 @@ const createTirito = async (req, res, next) => {
       return res.status(400).json({ message: 'Ya tenés un tirito activo' });
     }
 
-    const { title, description } = req.body;
+    const { title, description, location } = req.body;
 
     // Procesar imágenes subidas
     const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
@@ -135,6 +135,7 @@ const createTirito = async (req, res, next) => {
       title,
       description,
       images,
+      location: location || null,
       createdBy: userId
     });
 

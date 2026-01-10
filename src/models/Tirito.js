@@ -23,6 +23,12 @@ const tiritoSchema = new mongoose.Schema({
     },
     default: []
   },
+  location: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'La ubicación no puede exceder 200 caracteres'],
+    default: null
+  },
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
