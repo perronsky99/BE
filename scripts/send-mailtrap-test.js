@@ -1,14 +1,34 @@
-// Envío por la API HTTP de Mailtrap (no requiere paquete adicional).
-// Usa el token de la cuenta Mailtrap que el usuario proporcionó.
-const TOKEN = "738c320cee63cafc742dfd7cc09c6ec7";
+// Carga variables de entorno desde .env si existe
+require('dotenv').config();
+
+const TOKEN = process.env.MAILTRAP_API_TOKEN || "738c320cee63cafc742dfd7cc09c6ec7";
+const rawFrom = process.env.SMTP_FROM || 'hello@demomailtrap.co';
+let FROM_EMAIL = 'hello@demomailtrap.co';
+let FROM_NAME = process.env.MAIL_FROM_NAME || 'Mailtrap Test';
+const TO_EMAIL = process.env.TEST_RECIPIENT || 'cesardelfinr@gmail.com';
+
+// Normaliza `rawFrom` que puede venir como:
+// - "Name <email@domain.com>"
+// - "email@domain.com"
+const angleMatch = String(rawFrom).match(/^\s*"?([^"<]+?)"?\s*<\s*([^>]+)\s*>\s*$/);
+if (angleMatch) {
+  FROM_NAME = FROM_NAME || angleMatch[1].trim();
+  FROM_EMAIL = angleMatch[2].trim();
+} else if (String(rawFrom).includes('@')) {
+  FROM_EMAIL = String(rawFrom).trim();
+} else {
+  FROM_EMAIL = 'hello@demomailtrap.co';
+}
 
 const payload = {
-  from: { email: "hello@demomailtrap.co", name: "Mailtrap Test" },
-  to: [{ email: "cesardelfinr@gmail.com" }],
-  subject: "You are awesome!",
-  text: "Congrats for sending test email with Mailtrap!",
+  from: { email: FROM_EMAIL, name: FROM_NAME },
+  to: [{ email: TO_EMAIL }],
+  subject: "Esto es una prueba de TIRITO con Mailtrap",
+  text: "FELICITACIONES! Si estás leyendo esto, el envío de emails desde Tirito funciona correctamente usando Mailtrap como proveedor SMTP.",
   category: "Integration Test",
 };
+
+console.log('Usando FROM:', FROM_NAME, `<${FROM_EMAIL}>`, '→ TO:', TO_EMAIL);
 
 (async () => {
   try {
