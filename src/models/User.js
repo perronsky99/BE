@@ -95,6 +95,15 @@ const userSchema = new mongoose.Schema({
     maxlength: [1000, 'La biografía no puede exceder 1000 caracteres'],
     default: null
   },
+  // Password reset
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
+  },
   email: {
     type: String,
     required: [true, 'El email es requerido'],

@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
+const crypto = require('crypto');
+const logger = require('../utils/logger');
 
 // POST /api/auth/register
 const register = async (req, res, next) => {
@@ -142,7 +144,80 @@ const login = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/auth/password/request
+ * body: { email }
+ */
+const requestPasswordReset = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email es requerido' });
+
+    const user = await User.findOne({ email });
+
+    // Siempre responder éxito para evitar enumeración de usuarios
+    if (!user) {
+      logger.info(`[password] Request for non-existing email: ${email}`);
+      return res.json({ message: 'Si existe una cuenta con ese email, recibirás instrucciones para restablecer la contraseña' });
+    }
+
+    // Generar token y expiración (1 hora)
+    const token = crypto.randomBytes(20).toString('hex');
+    const expires = Date.now() + 3600000; // 1 hora
+
+    // Evitar disparar validaciones de Mongoose si el documento de usuario está incompleto;
+    // usamos un update directo para escribir solo los campos del token.
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { resetPasswordToken: token, resetPasswordExpires: expires } }
+    );
+
+    // Construir link de restablecimiento: usar FRONTEND_URL si está configurado
+    // (en desarrollo suele ser http://localhost:4200). Si no existe, caer
+    // en el host actual como fallback.
+    const frontendBase = (process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim()) || `${req.protocol}://${req.get('host')}`;
+    const resetUrl = `${frontendBase.replace(/\/$/, '')}/auth/reset-password?token=${token}`;
+
+    // Enviar email - por ahora registramos en logs (el env puede configurarse luego)
+    logger.info(`[password] Reset link for ${email}: ${resetUrl}`);
+
+    return res.json({ message: 'Si existe una cuenta con ese email, recibirás instrucciones para restablecer la contraseña' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/auth/password/reset
+ * body: { token, password }
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
+
+    const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpires: { $gt: Date.now() } });
+    if (!user) return res.status(400).json({ message: 'Token inválido o expirado' });
+
+    // Actualizar contraseña y limpiar token.
+    // Algunas instancias de usuario en la BD pueden tener campos faltantes y
+    // `save()` dispararía validaciones. Para asegurar que el password se hashee
+    // por el pre('save') definido en el modelo pero sin validar el resto, usamos
+    // save({ validateBeforeSave: false }).
+    user.password = password;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save({ validateBeforeSave: false });
+
+    return res.json({ message: 'Contraseña restablecida correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
-  login
+  login,
+  requestPasswordReset,
+  resetPassword
 };

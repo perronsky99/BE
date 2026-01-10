@@ -3,6 +3,15 @@ const { nodeEnv } = require('../config/env');
 const errorHandler = (err, req, res, next) => {
   console.error('Error:', err);
 
+  // Log adicional para debugging: ruta y cuerpo (no imprimir password en claro)
+  try {
+    const safeBody = { ...req.body };
+    if (safeBody && safeBody.password) safeBody.password = '[REDACTED]';
+    console.error('Request:', req.method, req.originalUrl, 'Body:', JSON.stringify(safeBody));
+  } catch (e) {
+    // ignore
+  }
+
   // Error de validación de Mongoose
   if (err.name === 'ValidationError') {
     const messages = Object.values(err.errors).map(e => e.message);
