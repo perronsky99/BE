@@ -75,7 +75,8 @@ const cedulaLookup = (req, res, next) => {
           // silenciosamente ignora parse errors y deja que otras heurísticas manejen
         }
 
-        const result = { firstName: firstName || '', lastName: lastName || '', id: cedulaKey };
+        const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+        const result = { firstName: firstName || '', lastName: lastName || '', fullName: fullName || '', id: cedulaKey };
         // Include raw HTML only when explicitly requested (debug=1)
         const includeRaw = req.query && (req.query.debug === '1' || req.query.debug === 'true');
         if (includeRaw) {
