@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const mailer = require('../utils/mailer');
 
 // POST /api/auth/register
 const register = async (req, res, next) => {
@@ -178,8 +179,18 @@ const requestPasswordReset = async (req, res, next) => {
     const frontendBase = (process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim()) || `${req.protocol}://${req.get('host')}`;
     const resetUrl = `${frontendBase.replace(/\/$/, '')}/auth/reset-password?token=${token}`;
 
-    // Enviar email - por ahora registramos en logs (el env puede configurarse luego)
-    logger.info(`[password] Reset link for ${email}: ${resetUrl}`);
+    // Enviar email con el link de restablecimiento. Si no hay transporte configurado,
+    // el helper hará fallback a logs.
+    try {
+      const subject = 'Restablecer contraseña - Tirito';
+      const templateData = { firstName: user.firstName || user.name || '', resetUrl };
+      await mailer.sendMail({ to: email, subject, template: 'reset-password', templateData, text: `Restablecer contraseña: ${resetUrl}` });
+      logger.info(`[password] Reset email queued for ${email}`);
+    } catch (e) {
+      // Mantener compatibilidad: loguear el link si falla el envío
+      logger.error(`[password] Failed to send reset email to ${email}: ${e?.message || e}`);
+      logger.info(`[password] Reset link for ${email}: ${resetUrl}`);
+    }
 
     return res.json({ message: 'Si existe una cuenta con ese email, recibirás instrucciones para restablecer la contraseña' });
   } catch (error) {
