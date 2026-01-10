@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getMe, updateMe } = require('../controllers/users.controller');
+const { getFavorites, addFavorite, removeFavorite } = require('../controllers/users.controller');
 const auth = require('../middlewares/auth.middleware');
 
 // Todas las rutas requieren autenticación
@@ -11,5 +12,10 @@ router.get('/me', getMe);
 
 // PATCH /api/users/me
 router.patch('/me', updateMe);
+
+// Favorites
+router.get('/me/favorites', getFavorites);
+router.post('/me/favorites/:tiritoId', addFavorite);
+router.delete('/me/favorites/:tiritoId', removeFavorite);
 
 module.exports = router;
