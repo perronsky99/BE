@@ -3,6 +3,7 @@ const { generateToken } = require('../utils/jwt');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const mailer = require('../utils/mailer');
+const PasswordResetAttempt = require('../models/PasswordResetAttempt');
 
 // POST /api/auth/register
 const register = async (req, res, next) => {
@@ -174,6 +175,38 @@ const requestPasswordReset = async (req, res, next) => {
     metrics.inc('password_reset_requests');
 
     const user = await User.findOne({ email });
+
+    // Per-email rate limiting: limit attempts per account within a window
+    try {
+      const EMAIL_LIMIT = parseInt(process.env.EMAIL_REQUEST_LIMIT || '3', 10);
+      const WINDOW_MS = parseInt(process.env.EMAIL_REQUEST_WINDOW_MS || String(60 * 60 * 1000), 10);
+      const now = Date.now();
+      let attempt = await PasswordResetAttempt.findOne({ email });
+      if (!attempt) {
+        attempt = await PasswordResetAttempt.create({ email, count: 1, windowStart: now });
+      } else {
+        const windowStart = attempt.windowStart ? new Date(attempt.windowStart).getTime() : 0;
+        if (now - windowStart <= WINDOW_MS) {
+          // inside window
+          if (attempt.count >= EMAIL_LIMIT) {
+            const metrics = require('../utils/metrics');
+            metrics.inc('password_reset_rate_limited');
+            logger.warn(`[password] Rate limited by email: ${email}`);
+            return res.status(429).json({ message: 'Demasiadas solicitudes de recuperación de contraseña. Intentá más tarde.' });
+          }
+          attempt.count = attempt.count + 1;
+          await attempt.save();
+        } else {
+          // window expired: reset
+          attempt.count = 1;
+          attempt.windowStart = now;
+          await attempt.save();
+        }
+      }
+    } catch (e) {
+      // if rate limiter fails, don't block the flow — just log
+      logger.error('[password] Error applying email rate limiter', e?.message || e);
+    }
 
     // Siempre responder éxito para evitar enumeración de usuarios
     if (!user) {
