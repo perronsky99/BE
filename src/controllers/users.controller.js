@@ -12,10 +12,21 @@ const getMe = async (req, res, next) => {
     res.json({
       user: {
         id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
         name: user.name,
         email: user.email,
         role: user.role,
         verificationStatus: user.verificationStatus,
+        documentType: user.documentType,
+        documentNumber: user.documentNumber,
+        birthDate: user.birthDate,
+        estado: user.estado,
+        municipio: user.municipio,
+        direccion: user.direccion,
+        phoneMobile: user.phoneMobile,
+        phoneLocal: user.phoneLocal,
+        username: user.username,
         createdAt: user.createdAt
       }
     });
