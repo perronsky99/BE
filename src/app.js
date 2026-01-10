@@ -38,6 +38,7 @@ app.get('/api/metrics', (req, res) => {
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);
+const externalRoutes = require('./routes/external.routes');
 app.use('/api/users', usersRoutes);
 app.use('/api/tiritos', tiritosRoutes);
 app.use('/api/chats', chatsRoutes);
@@ -45,6 +46,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/profiles', profilesRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/tirito-requests', tiritoRequestsRoutes);
+app.use('/api/external', externalRoutes);
 
 // Ruta 404
 app.use((req, res) => {
