@@ -170,11 +170,15 @@ const requestPasswordReset = async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: 'Email es requerido' });
 
+    const metrics = require('../utils/metrics');
+    metrics.inc('password_reset_requests');
+
     const user = await User.findOne({ email });
 
     // Siempre responder éxito para evitar enumeración de usuarios
     if (!user) {
       logger.info(`[password] Request for non-existing email: ${email}`);
+      metrics.inc('password_reset_nonexistent');
       return res.json({ message: 'Si existe una cuenta con ese email, recibirás instrucciones para restablecer la contraseña' });
     }
 
@@ -188,6 +192,8 @@ const requestPasswordReset = async (req, res, next) => {
       { _id: user._id },
       { $set: { resetPasswordToken: token, resetPasswordExpires: expires } }
     );
+
+    metrics.inc('password_reset_token_set');
 
     // Construir link de restablecimiento: usar FRONTEND_URL si está configurado
     // (en desarrollo suele ser http://localhost:4200). Si no existe, caer
@@ -206,6 +212,7 @@ const requestPasswordReset = async (req, res, next) => {
       // Mantener compatibilidad: loguear el link si falla el envío
       logger.error(`[password] Failed to send reset email to ${email}: ${e?.message || e}`);
       logger.info(`[password] Reset link for ${email}: ${resetUrl}`);
+      metrics.inc('password_reset_email_fail');
     }
 
     return res.json({ message: 'Si existe una cuenta con ese email, recibirás instrucciones para restablecer la contraseña' });
