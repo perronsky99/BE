@@ -80,6 +80,22 @@ const register = async (req, res, next) => {
     // Generar token
     const token = generateToken(user);
 
+    // Enviar email de bienvenida (no bloquear respuesta al cliente)
+    (async () => {
+      try {
+        const frontendBase = (process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim()) || `${req.protocol}://${req.get('host')}`;
+        const templateData = {
+          firstName: user.firstName || user.name || '',
+          frontendUrl: frontendBase.replace(/\/$/, '')
+        };
+        const subject = 'Bienvenido a Tirito';
+        await mailer.sendMail({ to: user.email, subject, template: 'welcome', templateData, text: `Bienvenido a Tirito. Empezá en ${templateData.frontendUrl}` });
+        logger.info(`[welcome] Bienvenida enviada a ${user.email}`);
+      } catch (e) {
+        logger.error(`[welcome] Error enviando bienvenida a ${user.email}: ${e?.message || e}`);
+      }
+    })();
+
     res.status(201).json({
       message: 'Usuario registrado correctamente',
         user: {
