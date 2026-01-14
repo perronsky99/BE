@@ -141,6 +141,22 @@ const login = async (req, res, next) => {
       return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
+    // Prevent login if user is banned (unless ban expired)
+    if (user.isBanned) {
+      if (user.banExpires && new Date(user.banExpires) <= new Date()) {
+        // Auto-unban expired ban
+        user.isBanned = false;
+        user.banReason = null;
+        user.bannedAt = null;
+        user.banExpires = null;
+        user.bannedBy = null;
+        await user.save();
+      } else {
+        const until = user.banExpires ? new Date(user.banExpires).toISOString() : null;
+        return res.status(403).json({ message: `Cuenta bloqueada: ${user.banReason || 'motivos administrativos'}`, reason: user.banReason, banExpires: until });
+      }
+    }
+
     // Generar token
     const token = generateToken(user);
 

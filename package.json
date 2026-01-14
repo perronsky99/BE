@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "create-admin": "node src/scripts/create-admin.js",
     "find-orphan-tiritos": "node src/scripts/find-orphan-tiritos.js"
   },
   "keywords": [

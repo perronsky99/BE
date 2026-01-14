@@ -119,7 +119,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'worker', 'business'],
+    enum: ['user', 'worker', 'business', 'admin'],
     default: 'user'
   },
   verificationStatus: {
@@ -136,6 +136,35 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tirito'
   }]
+  ,
+  // Usuarios bloqueados por este usuario
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
+  ,
+  // Estado de baneo/ suspensión (administrativo)
+  isBanned: {
+    type: Boolean,
+    default: false
+  },
+  banReason: {
+    type: String,
+    default: null
+  },
+  bannedAt: {
+    type: Date,
+    default: null
+  },
+  banExpires: {
+    type: Date,
+    default: null
+  },
+  bannedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  }
 });
 
 // Generar username antes de guardar si no tiene

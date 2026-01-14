@@ -26,6 +26,21 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Usuario no encontrado' });
     }
 
+    // Rechazar requests si el usuario está baneado (auto-unban si expiró)
+    if (user.isBanned) {
+      if (user.banExpires && new Date(user.banExpires) <= new Date()) {
+        // Auto-unban expired ban
+        user.isBanned = false;
+        user.banReason = null;
+        user.bannedAt = null;
+        user.banExpires = null;
+        user.bannedBy = null;
+        await user.save();
+      } else {
+        return res.status(403).json({ message: 'Cuenta bloqueada', reason: user.banReason, banExpires: user.banExpires });
+      }
+    }
+
     // Agregar usuario al request
     req.user = {
       id: user._id,

@@ -147,3 +147,75 @@ const removeFavorite = async (req, res, next) => {
 module.exports.getFavorites = getFavorites;
 module.exports.addFavorite = addFavorite;
 module.exports.removeFavorite = removeFavorite;
+
+// Admin: listar usuarios baneados
+const listBannedUsers = async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Permiso denegado' });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 30;
+    const skip = (page - 1) * limit;
+    const query = { isBanned: true };
+    const total = await User.countDocuments(query);
+    const items = await User.find(query)
+      .select('firstName lastName email username banReason bannedAt banExpires bannedBy')
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    res.json({ data: items, total, page, limit });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin: banear usuario directamente
+const adminBanUser = async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Permiso denegado' });
+    const { userId } = req.params;
+    const { reason, durationDays } = req.body;
+    const target = await User.findById(userId);
+    if (!target) return res.status(404).json({ message: 'Usuario no encontrado' });
+    target.isBanned = true;
+    target.banReason = reason || 'administrative_action';
+    target.bannedAt = new Date();
+    target.bannedBy = req.user.id;
+    if (durationDays && Number(durationDays) > 0) {
+      target.banExpires = new Date(Date.now() + Number(durationDays) * 24 * 60 * 60 * 1000);
+    } else {
+      target.banExpires = null;
+    }
+    await target.save();
+    // audit
+    const Audit = require('../models/Audit');
+    await Audit.create({ actor: req.user.id, action: 'ban_user', targetUser: target._id, reason: target.banReason });
+    res.json({ message: 'Usuario baneado', userId: target._id });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin: desbanear usuario
+const adminUnbanUser = async (req, res, next) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Permiso denegado' });
+    const { userId } = req.params;
+    const target = await User.findById(userId);
+    if (!target) return res.status(404).json({ message: 'Usuario no encontrado' });
+    target.isBanned = false;
+    target.banReason = null;
+    target.bannedAt = null;
+    target.banExpires = null;
+    target.bannedBy = null;
+    await target.save();
+    const Audit = require('../models/Audit');
+    await Audit.create({ actor: req.user.id, action: 'unban_user', targetUser: target._id });
+    res.json({ message: 'Usuario desbaneado', userId: target._id });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.listBannedUsers = listBannedUsers;
+module.exports.adminBanUser = adminBanUser;
+module.exports.adminUnbanUser = adminUnbanUser;
