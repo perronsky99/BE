@@ -67,6 +67,79 @@ npm start
 - `GET /api/metrics` — Métricas en memoria (dev)
 - `GET /api/health` — Health check
 
+### Reportes y moderación
+
+- `POST /api/reports` — Crear un reporte de usuario (auth). Body: `{ targetId, category, description?, evidence? }`.
+- `GET /api/reports` — Listar reportes (requiere rol `admin`).
+- `PUT /api/reports/:id/close` — Cerrar un reporte (admin).
+- `POST /api/reports/:id/action` — Ejecutar una acción asociada al reporte (admin). Payload ejemplos:
+	- Banear: `{ action: 'ban', durationHours: 168, reason: 'inappropriate_behavior' }`
+	- Desbanear: `{ action: 'unban' }`
+	- Suspender: `{ action: 'suspend', durationHours: 24, reason: 'sustained_abuse' }`
+- `POST /api/reports/:id/user-action` — Acción que puede ejecutar el propio reporter (ej. bloquear al objetivo): `{ action: 'user_block' | 'user_unblock' }` (auth).
+
+Las categorías soportadas en el modelo `Report` son (enum): `inappropriate_behavior`, `suspected_fraud`, `vulgar_language`, `harassment`, `spam`, `impersonation`, `other`.
+
+### Admin — gestión directa de usuarios
+
+- `GET /api/users/admin/bans` — Listar usuarios baneados (admin).
+- `POST /api/users/admin/ban/:userId` — Banear un usuario directamente (admin). Body ejemplo: `{ reason: 'sustained_abuse', durationHours: 168 }`.
+- `POST /api/users/admin/unban/:userId` — Desbanear usuario (admin).
+
+### Auditoría y logs de acciones administrativas
+
+- `GET /api/admin/audits` — Listar registros de auditoría (admin). Los registros incluyen `actor`, `action`, `targetUser`, `report` (si aplica), `reason`, `meta` y `createdAt`.
+
+Cada acción administrativa (ban, unban, suspend, user_block, user_unblock, etc.) escribe un registro en el modelo `Audit` para trazabilidad.
+
+### Scripts y utilidades
+
+- `src/scripts/create-admin.js` — Script de ayuda para crear un usuario con rol `admin` desde la CLI. Ejecutar en la carpeta `BE`:
+
+```bash
+node src/scripts/create-admin.js --email admin@example.com --password tuPassword
+```
+
+### Comportamiento de login y middlewares
+
+- Los usuarios con `isBanned: true` están bloqueados: no pueden autenticarse ni usar endpoints protegidos con JWT. Si el baneo tiene `banExpires` y ya expiró, el sistema auto-desbanea al primer request válido (auto-unban).
+
+### Ejemplos rápidos (curl)
+
+- Crear reporte (user autenticado):
+```bash
+curl -X POST http://localhost:3000/api/reports \
+ -H "Authorization: Bearer <TOKEN>" \
+ -H "Content-Type: application/json" \
+ -d '{"targetId":"<targetId>", "category":"inappropriate_behavior", "description":"Lenguaje ofensivo"}'
+```
+
+- Banear vía reporte (admin):
+```bash
+curl -X POST http://localhost:3000/api/reports/<reportId>/action \
+ -H "Authorization: Bearer <ADMIN_TOKEN>" \
+ -H "Content-Type: application/json" \
+ -d '{"action":"ban","durationHours":168,"reason":"inappropriate_behavior"}'
+```
+
+- Banear usuario por id (admin):
+```bash
+curl -X POST http://localhost:3000/api/users/admin/ban/<userId> \
+ -H "Authorization: Bearer <ADMIN_TOKEN>" \
+ -H "Content-Type: application/json" \
+ -d '{"reason":"sustained_abuse","durationHours":168}'
+```
+
+### Integración frontend (nota rápida)
+
+La aplicación frontend (`TiritoApp`) incluye:
+
+- Modal de reporte para que usuarios reporten desde el chat (`ReportModalComponent`).
+- Vista administrativa de reportes: `/admin/reports` con botones para `Banear`, `Desbanear` y `Bloquear` que llaman a los endpoints descritos.
+- Vista administrativa de auditoría: `/admin/audits` para revisar registros de acciones.
+
+Si trabajas en frontend, revisa `TiritoApp/src/app/features/admin` y `TiritoApp/src/app/shared/ui` para los componentes y servicios añadidos.
+
 ## Realtime (socket.io)
 
 - Handshake: el cliente debe enviar `{ auth: { token: '<JWT>' } }` al conectar.
