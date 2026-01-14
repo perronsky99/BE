@@ -181,3 +181,78 @@ node src/scripts/find-orphan-tiritos.js
 
 ---
 Este README está enfocado a desarrolladores que trabajan con el backend; la información genérica o los recursos del template original han sido eliminados.
+
+## Arquitectura y diseño (visón de analista de sistemas)
+
+- Tipo de aplicación: API RESTful con complementos en tiempo real (Socket.io) y persistencia en MongoDB (Mongoose).
+- Componentes principales:
+	- Servidor Express.js (entry: `src/server.js` / `src/app.js`) que configura rutas, middlewares y socket.io.
+	- Modelos Mongoose bajo `src/models/` (representan entidades: `User`, `Report`, `Audit`, `Tirito`, `Chat`, `Message`, etc.).
+	- Controladores HTTP en `src/controllers/` que exponen la lógica por recurso.
+	- Middlewares de seguridad y validación (`auth.middleware.js`, `isAdmin.middleware.js`, `error.middleware.js`).
+	- Servicios y utilidades en `src/utils/` (p. ej. token JWT, email templates, helpers).
+
+### Principios de diseño
+
+- Separación de responsabilidades: rutas -> controllers -> services/models.
+- Seguridad: JWT para autenticación; middlewares para roles y bloqueo por baneo.
+- Trazabilidad: todas las acciones administrativas relevantes se registran en `Audit` para auditoría forense.
+- Resiliencia: validaciones y manejo de errores centralizado en `error.middleware.js`.
+
+## Modelos (resumen técnico)
+
+Nota: este resumen es un extracto orientativo. Ver los esquemas completos en `src/models/`.
+
+- `User` (campos relevantes para moderación):
+	- `_id`, `email`, `passwordHash`, `role` ("user" | "admin"), `isBanned` (bool), `banReason` (string), `bannedAt` (Date), `banExpires` (Date|null), `bannedBy` (ObjectId ref User), `blockedUsers` ([ObjectId])
+
+- `Report`:
+	- `_id`, `reporter` (User ref), `target` (User ref), `category` (enum), `description`, `evidence` (array), `status` (open|closed), `createdAt`.
+
+- `Audit`:
+	- `_id`, `actor` (User ref), `action` (string), `targetUser` (User ref optional), `report` (Report ref optional), `reason` (string optional), `meta` (mixed), `createdAt`.
+
+## Flujo de datos y escenarios (ejemplos)
+
+1. Usuario A reporta usuario B:
+	 - Cliente POST `/api/reports` -> controlador `createReport` crea documento `Report`, notifica admins (si procede) y retorna `reportId`.
+2. Admin revisa reporte:
+	 - Admin GET `/api/reports` -> lista de reportes.
+	 - Admin POST `/api/reports/:id/action` con `action: 'ban'` -> `reports.controller` ejecuta `handleReportAction`:
+		 - Calcula `banExpires` si `durationHours` provisto.
+		 - Actualiza `User` (`isBanned`, `banReason`, `bannedAt`, `banExpires`, `bannedBy`).
+		 - Crea un `Audit` con actor/admin, acción y meta.
+		 - Responde con estado y userId.
+3. Efecto en la autenticación:
+	 - `auth.middleware` rechaza peticiones JWT si `isBanned=true`. Si `banExpires` expiró, auto-desbanea.
+
+## Middlewares críticos
+
+- `auth.middleware.js`: valida JWT, carga `req.user`; rechaza si usuario baneado (status 403) y hace auto-unban si corresponde.
+- `isAdmin.middleware.js`: verifica `req.user.role === 'admin'` y retorna 403 si no.
+- `error.middleware.js`: captura errores y formatea respuestas JSON `{ status: 'error', message, code? }`.
+
+## Formato de respuestas y errores
+
+- Respuestas exitosas siguen patrón JSON simple: `{ message: 'Texto', ... }` o recursos directos.
+- Errores HTTP usan códigos estándares (400,401,403,404,500) y cuerpo: `{ error: true, message: 'Descripción', details?: {} }`.
+
+## Índices y rendimiento
+
+- Es recomendable índices en campos usados por consultas frecuentes: `User.email`, `Report.status`, `Report.createdAt`, `Audit.createdAt`.
+
+## Pruebas y verificación
+
+- Se realizaron pruebas manuales con `curl` para flujos: creación de reportes, acciones admin (ban/unban), login rechazado para ban, auditoría creada.
+- Para CI: recomendamos agregar tests unitarios con Mocha/Jest y pruebas de integración que levanten MongoDB en docker.
+
+## Despliegue
+
+- Variables de entorno ya descritas arriba. En producción, proteger `JWT_SECRET` y usar una base de datos gestionada.
+- Logs deben redirigirse a sistema de agregación (ELK, Datadog) y habilitar rotación.
+
+## Notas finales
+
+- Para cambios en la política de moderación (motivos, duraciones), actualizar las constantes y enums en `src/models/Report.js` y las vistas administrativas del frontend.
+- Para auditoría extendida, añade campos en `Audit.meta` con contexto adicional (IP, request headers, admin notes).
+
