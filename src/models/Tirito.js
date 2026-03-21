@@ -44,13 +44,39 @@ const tiritoSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    default: null
+  },
+  tags: {
+    type: [String],
+    default: []
+  },
+  price: {
+    type: Number,
+    default: null,
+    min: 0
+  },
+  currency: {
+    type: String,
+    enum: ['VES', 'USD'],
+    default: 'USD'
+  },
+  priceType: {
+    type: String,
+    enum: ['fixed', 'negotiable', 'free'],
+    default: 'free'
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Index para buscar tiritos activos por usuario
 tiritoSchema.index({ createdBy: 1, status: 1 });
+tiritoSchema.index({ status: 1, createdAt: -1 });
+tiritoSchema.index({ category: 1, status: 1, createdAt: -1 });
+tiritoSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
 module.exports = mongoose.model('Tirito', tiritoSchema);

@@ -32,7 +32,7 @@ module.exports = async function captchaMiddleware(req, res, next) {
     }
 
     // Optionally check score for v3 (if present)
-    if (typeof data.score === 'number' && data.score < 0.3) {
+    if (typeof data.score === 'number' && data.score < 0.5) {
       return res.status(400).json({ message: 'Captcha sospechoso' });
     }
 

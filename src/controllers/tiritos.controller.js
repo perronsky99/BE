@@ -1,4 +1,6 @@
 const Tirito = require('../models/Tirito');
+const Subscription = require('../models/Subscription');
+const { PLAN_LIMITS } = require('../models/Subscription');
 
 /**
  * Obtiene las iniciales de un nombre o username
@@ -111,17 +113,25 @@ const createTirito = async (req, res, next) => {
     }
     const userId = req.user.id;
 
-    // REGLA CLAVE: Verificar si ya tiene un tirito activo
+    // Verificar límite según plan de suscripción
+    const subscription = await Subscription.findOne({ userId }) || { plan: 'free' };
+    const limits = PLAN_LIMITS[subscription.plan] || PLAN_LIMITS.free;
     const activeTiritos = await Tirito.countDocuments({
       createdBy: userId,
       status: { $in: ['open', 'in_progress'] }
     });
 
-    if (activeTiritos >= 1) {
-      return res.status(400).json({ message: 'Ya tenés un tirito activo' });
+    if (activeTiritos >= limits.maxActiveTiritos) {
+      return res.status(400).json({
+        message: `Alcanzaste el límite de ${limits.maxActiveTiritos} tirito(s) activo(s) en tu plan ${subscription.plan}. Cerrá uno o mejorá tu plan.`,
+        upgradeRequired: true,
+        currentPlan: subscription.plan,
+        activeTiritos,
+        maxAllowed: limits.maxActiveTiritos
+      });
     }
 
-    const { title, description, location } = req.body;
+    const { title, description, location, category, tags, price, currency, priceType } = req.body;
 
     // Procesar imágenes subidas
     const images = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
@@ -136,6 +146,11 @@ const createTirito = async (req, res, next) => {
       description,
       images,
       location: location || null,
+      category: category || null,
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())) : [],
+      price: price ? Number(price) : null,
+      currency: currency || 'USD',
+      priceType: priceType || 'free',
       createdBy: userId
     });
 
@@ -274,19 +289,25 @@ const canCreateTirito = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
+    const subscription = await Subscription.findOne({ userId }) || { plan: 'free' };
+    const limits = PLAN_LIMITS[subscription.plan] || PLAN_LIMITS.free;
     const activeTiritos = await Tirito.countDocuments({
       createdBy: userId,
       status: { $in: ['open', 'in_progress'] }
     });
 
-    if (activeTiritos >= 1) {
+    if (activeTiritos >= limits.maxActiveTiritos) {
       return res.json({
         canCreate: false,
-        message: 'Ya tenés un tirito activo. Cerralo antes de crear otro.'
+        message: `Alcanzaste tu límite de ${limits.maxActiveTiritos} tirito(s) activo(s). Cerrá uno o mejorá tu plan.`,
+        upgradeRequired: activeTiritos >= 1 && subscription.plan === 'free',
+        currentPlan: subscription.plan,
+        activeTiritos,
+        maxAllowed: limits.maxActiveTiritos
       });
     }
 
-    res.json({ canCreate: true });
+    res.json({ canCreate: true, currentPlan: subscription.plan, activeTiritos, maxAllowed: limits.maxActiveTiritos });
   } catch (error) {
     next(error);
   }

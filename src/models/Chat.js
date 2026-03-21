@@ -16,7 +16,7 @@ const chatSchema = new mongoose.Schema({
   }
 });
 
-// Index para buscar chats por tirito
 chatSchema.index({ tiritoId: 1 });
+chatSchema.index({ participants: 1 });
 
 module.exports = mongoose.model('Chat', chatSchema);

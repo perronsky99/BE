@@ -10,4 +10,8 @@ const auditSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+auditSchema.index({ actor: 1, createdAt: -1 });
+auditSchema.index({ targetUser: 1, createdAt: -1 });
+auditSchema.index({ action: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Audit', auditSchema);

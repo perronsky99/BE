@@ -21,6 +21,8 @@ const ratingSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-ratingSchema.index({ targetId: 1 });
+ratingSchema.index({ targetId: 1, createdAt: -1 });
+ratingSchema.index({ tiritoId: 1, raterId: 1 }, { unique: true });
+ratingSchema.index({ raterId: 1 });
 
 module.exports = mongoose.model('Rating', ratingSchema);
