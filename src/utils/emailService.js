@@ -265,7 +265,30 @@ const sendVerificationResult = (user, approved, rejectionReason) => {
   });
 };
 
-// ─── 11. DIGEST (NOTIFICACIONES + CHATS SIN RESPONDER) ─────────────
+// ─── 11. NUEVO MENSAJE DE CHAT ──────────────────────────────────────
+const sendChatMessage = (recipientUser, senderName, tirito, messagePreview, isNewChat) => {
+  const to = getEmail(recipientUser);
+  if (!to) return;
+  const subject = isNewChat
+    ? `${senderName} te contactó por tu tirito "${tirito.title}"`
+    : `Nuevo mensaje de ${senderName} en "${tirito.title}"`;
+  safeSend('chat-message', {
+    to,
+    subject,
+    template: 'chat-message',
+    templateData: {
+      firstName: getName(recipientUser),
+      senderName,
+      tiritoTitle: tirito.title,
+      messagePreview: (messagePreview || '').substring(0, 200),
+      isNewChat: !!isNewChat,
+      chatUrl: `${FRONTEND_URL()}/chat/${tirito._id}`
+    },
+    text: `${senderName} te envió un mensaje en "${tirito.title}": ${(messagePreview || '').substring(0, 200)}`
+  }, `chat-msg:${recipientUser._id || recipientUser.id}:${tirito._id}:${Date.now()}`);
+};
+
+// ─── 12. DIGEST (NOTIFICACIONES + CHATS SIN RESPONDER) ─────────────
 const sendDigest = (user, { unreadNotifications, notificationSamples, unansweredChats, chatSamples }) => {
   const to = getEmail(user);
   if (!to) return;
@@ -296,5 +319,6 @@ module.exports = {
   sendProfileUpdated,
   sendPasswordChanged,
   sendVerificationResult,
+  sendChatMessage,
   sendDigest
 };

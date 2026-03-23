@@ -54,4 +54,31 @@ const auth = async (req, res, next) => {
   }
 };
 
+/**
+ * Auth opcional: si hay token válido, resuelve req.user.
+ * Si no hay token o es inválido, continúa con req.user = null.
+ * Útil para endpoints públicos que muestran contenido extra a usuarios logueados.
+ */
+const optionalAuth = async (req, res, next) => {
+  req.user = null;
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
+
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyToken(token);
+    if (!decoded) return next();
+
+    const user = await User.findById(decoded.sub);
+    if (user && !user.isBanned) {
+      req.user = { id: user._id, email: user.email, role: user.role };
+    }
+  } catch (_) {
+    // Silenciar: auth opcional no debe bloquear
+  }
+  next();
+};
+
+auth.optional = optionalAuth;
+
 module.exports = auth;

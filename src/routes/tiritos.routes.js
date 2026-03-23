@@ -19,6 +19,9 @@ router.get('/', getTiritos);
 // GET /api/tiritos/creator/:creatorId - Tiritos publicados por un creator (público)
 router.get('/creator/:creatorId', getTiritosByCreator);
 
+// GET /api/tiritos/:id - Detalle de un tirito (público, auth opcional)
+router.get('/:id', auth.optional, getTiritoById);
+
 // Las siguientes rutas requieren autenticación
 router.use(auth);
 
@@ -35,9 +38,6 @@ router.get('/can-create', canCreateTirito);
 
 // GET /api/tiritos/shared/:userId - Verificar si hay tiritos compartidos con otro usuario
 router.get('/shared/:userId', checkSharedTiritos);
-
-// GET /api/tiritos/:id - Detalle de un tirito
-router.get('/:id', getTiritoById);
 
 // POST /api/tiritos - Crear tirito (con imágenes)
 router.post('/', upload.array('images', 5), createTirito);

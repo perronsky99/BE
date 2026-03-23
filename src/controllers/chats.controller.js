@@ -4,6 +4,7 @@ const Tirito = require('../models/Tirito');
 const User = require('../models/User');
 const TiritoRequest = require('../models/TiritoRequest');
 const { createNotification } = require('./notifications.controller');
+const emailService = require('../utils/emailService');
 
 /**
  * Verificar si un usuario puede chatear en un tirito
@@ -378,6 +379,12 @@ const sendMessage = async (req, res, next) => {
         chatId: chat._id,
         actionUrl: `/chat/${tiritoId}`
       });
+
+      // Enviar email al receptor (fire-and-forget)
+      const recipientUser = await User.findById(recipientId).select('firstName name email').lean();
+      if (recipientUser) {
+        emailService.sendChatMessage(recipientUser, senderLabel, tirito, content.trim(), isNewChat);
+      }
     }
 
     res.status(201).json({
