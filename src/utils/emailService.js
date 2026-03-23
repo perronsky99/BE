@@ -3,24 +3,81 @@
  *
  * Todas las funciones son fire-and-forget: no bloquean la respuesta HTTP.
  * Errores se loguean pero nunca rompen el flujo principal.
+ *
+ * Protecciones de producción:
+ * - Idempotencia básica por dedupKey (in-memory, TTL 60s)
+ * - Throttling por tag+email (ventana 10s)
+ * - Validación de destinatario antes de enviar
  */
 const mailer = require('./mailer');
 const logger = require('./logger');
 
-const FRONTEND_URL = () =>
-  (process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim().replace(/\/$/, '')) ||
-  'http://localhost:4200';
+// ─── INFRAESTRUCTURA ────────────────────────────────────────────────
+
+const FRONTEND_URL = () => {
+  const raw = process.env.FRONTEND_URL?.trim();
+  return raw ? raw.replace(/\/+$/, '') : 'http://localhost:4200';
+};
+
+/** Extrae firstName del usuario de forma segura */
+const getName = (user) => user?.firstName || user?.name || '';
+
+/** Extrae email del usuario de forma segura */
+const getEmail = (user) => user?.email || null;
+
+// Idempotencia: evita duplicados del mismo evento (TTL 60s)
+const _dedupSet = new Set();
+const DEDUP_TTL_MS = 60_000;
+
+// Throttle: evita spam accidental por tag+email (ventana 10s)
+const _throttleMap = new Map();
+const THROTTLE_WINDOW_MS = 10_000;
+
+// Limpieza periódica del throttle map (cada 5 min, no bloquea shutdown)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of _throttleMap) {
+    if (now - ts > THROTTLE_WINDOW_MS * 2) _throttleMap.delete(key);
+  }
+}, 300_000).unref();
 
 /**
  * Envía un email de forma segura (fire-and-forget).
  * Nunca lanza excepciones.
+ * @param {string} tag - Identificador del tipo de email
+ * @param {object} params - Parámetros para mailer.sendMail
+ * @param {string} [dedupKey] - Clave opcional de idempotencia
  */
-const safeSend = async (tag, params) => {
+const safeSend = async (tag, params, dedupKey) => {
   try {
+    if (!params?.to) {
+      logger.warn(`[email:${tag}] Omitido: destinatario ausente`);
+      return;
+    }
+
+    // Idempotencia: si ya se envió este evento exacto, omitir
+    if (dedupKey) {
+      if (_dedupSet.has(dedupKey)) {
+        logger.info(`[email:${tag}] Duplicado omitido`);
+        return;
+      }
+      _dedupSet.add(dedupKey);
+      setTimeout(() => _dedupSet.delete(dedupKey), DEDUP_TTL_MS);
+    }
+
+    // Throttle: no enviar el mismo tag al mismo destino en < 10s
+    const throttleKey = `${tag}:${params.to}`;
+    const lastSent = _throttleMap.get(throttleKey);
+    if (lastSent && Date.now() - lastSent < THROTTLE_WINDOW_MS) {
+      logger.info(`[email:${tag}] Throttled para ${params.to}`);
+      return;
+    }
+    _throttleMap.set(throttleKey, Date.now());
+
     await mailer.sendMail(params);
     logger.info(`[email:${tag}] Enviado a ${params.to}`);
   } catch (e) {
-    logger.error(`[email:${tag}] Error enviando a ${params.to}: ${e?.message || e}`);
+    logger.error(`[email:${tag}] Error enviando a ${params?.to || 'desconocido'}: ${e?.message || e}`);
   }
 };
 
@@ -29,12 +86,14 @@ const safeSend = async (tag, params) => {
 
 // ─── 2. TIRITO CREADO ───────────────────────────────────────────────
 const sendTiritoCreated = (user, tirito) => {
+  const to = getEmail(user);
+  if (!to) return;
   safeSend('tirito-created', {
-    to: user.email,
+    to,
     subject: `Tu tirito "${tirito.title}" fue creado`,
     template: 'tirito-created',
     templateData: {
-      firstName: user.firstName || user.name || '',
+      firstName: getName(user),
       tiritoTitle: tirito.title,
       tiritoDescription: (tirito.description || '').substring(0, 200),
       tiritoLocation: tirito.location || null,
@@ -43,7 +102,7 @@ const sendTiritoCreated = (user, tirito) => {
       tiritoUrl: `${FRONTEND_URL()}/tiritos/${tirito._id}`
     },
     text: `Tu tirito "${tirito.title}" fue creado exitosamente. Velo en ${FRONTEND_URL()}/tiritos/${tirito._id}`
-  });
+  }, `tirito-created:${tirito._id}`);
 };
 
 // ─── 3. TIRITO CAMBIO DE ESTADO ─────────────────────────────────────
@@ -54,12 +113,14 @@ const STATUS_MESSAGES = {
 };
 
 const sendTiritoStatusChanged = (user, tirito, newStatus, assignedToName) => {
+  const to = getEmail(user);
+  if (!to) return;
   safeSend('tirito-status', {
-    to: user.email,
-    subject: `Tu tirito "${tirito.title}" cambio a ${STATUS_LABELS[newStatus] || newStatus}`,
+    to,
+    subject: `Tu tirito "${tirito.title}" cambió a ${STATUS_LABELS[newStatus] || newStatus}`,
     template: 'tirito-status-changed',
     templateData: {
-      firstName: user.firstName || user.name || '',
+      firstName: getName(user),
       tiritoTitle: tirito.title,
       newStatus,
       statusLabel: STATUS_LABELS[newStatus] || newStatus,
@@ -67,54 +128,60 @@ const sendTiritoStatusChanged = (user, tirito, newStatus, assignedToName) => {
       assignedToName: assignedToName || null,
       tiritoUrl: `${FRONTEND_URL()}/tiritos/${tirito._id}`
     },
-    text: `Tu tirito "${tirito.title}" cambio a ${STATUS_LABELS[newStatus] || newStatus}.`
-  });
+    text: `Tu tirito "${tirito.title}" cambió a ${STATUS_LABELS[newStatus] || newStatus}.`
+  }, `tirito-status:${tirito._id}:${newStatus}`);
 };
 
 // ─── 4. ALGUIEN INTERESADO (NUEVA SOLICITUD) ────────────────────────
 const sendTiritoRequestNew = (creatorUser, requesterName, tirito, message) => {
+  const to = getEmail(creatorUser);
+  if (!to) return;
   safeSend('request-new', {
-    to: creatorUser.email,
+    to,
     subject: `${requesterName} quiere hacer tu tirito "${tirito.title}"`,
     template: 'tirito-request-new',
     templateData: {
-      firstName: creatorUser.firstName || creatorUser.name || '',
+      firstName: getName(creatorUser),
       requesterName,
       tiritoTitle: tirito.title,
       requesterMessage: message || null,
       requestsUrl: `${FRONTEND_URL()}/solicitudes`
     },
-    text: `${requesterName} quiere hacer tu tirito "${tirito.title}". Revisa tus solicitudes.`
+    text: `${requesterName} quiere hacer tu tirito "${tirito.title}". Revisá tus solicitudes.`
   });
 };
 
 // ─── 5. SOLICITUD ACEPTADA / RECHAZADA ──────────────────────────────
 const sendRequestResult = (requesterUser, tiritoTitle, tiritoId, accepted) => {
+  const to = getEmail(requesterUser);
+  if (!to) return;
   const label = accepted ? 'aceptada' : 'rechazada';
   safeSend('request-result', {
-    to: requesterUser.email,
+    to,
     subject: `Tu solicitud para "${tiritoTitle}" fue ${label}`,
     template: 'tirito-request-result',
     templateData: {
-      firstName: requesterUser.firstName || requesterUser.name || '',
+      firstName: getName(requesterUser),
       tiritoTitle,
       accepted,
       actionUrl: accepted ? `${FRONTEND_URL()}/tiritos/${tiritoId}` : `${FRONTEND_URL()}/tiritos`,
       buttonText: accepted ? 'Ir al tirito' : 'Buscar tiritos'
     },
     text: `Tu solicitud para "${tiritoTitle}" fue ${label}.`
-  });
+  }, `request-result:${tiritoId}:${to}:${accepted}`);
 };
 
-// ─── 6. CALIFICACION RECIBIDA ───────────────────────────────────────
+// ─── 6. CALIFICACIÓN RECIBIDA ───────────────────────────────────────
 const sendRatingReceived = (targetUser, raterName, tirito, score, comment) => {
+  const to = getEmail(targetUser);
+  if (!to) return;
   const stars = '★'.repeat(score) + '☆'.repeat(5 - score);
   safeSend('rating-received', {
-    to: targetUser.email,
-    subject: `${raterName} te califico con ${score} estrellas`,
+    to,
+    subject: `${raterName} te calificó con ${score} estrellas`,
     template: 'rating-received',
     templateData: {
-      firstName: targetUser.firstName || targetUser.name || '',
+      firstName: getName(targetUser),
       raterName,
       tiritoTitle: tirito.title || tirito,
       score,
@@ -122,89 +189,100 @@ const sendRatingReceived = (targetUser, raterName, tirito, score, comment) => {
       comment: comment || null,
       profileUrl: `${FRONTEND_URL()}/perfil/${targetUser._id || targetUser.id}`
     },
-    text: `${raterName} te califico con ${score}/5 estrellas por "${tirito.title || tirito}".`
+    text: `${raterName} te calificó con ${score}/5 estrellas por "${tirito.title || tirito}".`
   });
 };
 
 // ─── 7. USUARIO BANEADO ─────────────────────────────────────────────
 const sendUserBanned = (user, reason, durationDays) => {
-  const duration = durationDays ? `${durationDays} dia(s)` : null;
+  const to = getEmail(user);
+  if (!to) return;
+  const duration = durationDays ? `${durationDays} día(s)` : null;
   safeSend('user-banned', {
-    to: user.email,
+    to,
     subject: 'Tu cuenta en Tirito fue suspendida',
     template: 'user-banned',
     templateData: {
-      firstName: user.firstName || user.name || '',
+      firstName: getName(user),
       actionLabel: 'suspendida',
-      reason: reason || 'Violacion de terminos de uso',
+      reason: reason || 'Violación de términos de uso',
       duration,
       date: new Date().toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' })
     },
-    text: `Tu cuenta en Tirito fue suspendida. Motivo: ${reason || 'Violacion de terminos de uso'}.`
+    text: `Tu cuenta en Tirito fue suspendida. Motivo: ${reason || 'Violación de términos de uso'}.`
   });
 };
 
 // ─── 8. DATOS PERSONALES MODIFICADOS ────────────────────────────────
 const sendProfileUpdated = (user, changedFields) => {
+  const to = getEmail(user);
+  if (!to) return;
   const fields = Array.isArray(changedFields) ? changedFields.join(', ') : changedFields;
   safeSend('profile-updated', {
-    to: user.email,
+    to,
     subject: 'Tus datos personales fueron actualizados',
     template: 'profile-updated',
     templateData: {
-      firstName: user.firstName || user.name || '',
+      firstName: getName(user),
       changedFields: fields,
       profileUrl: `${FRONTEND_URL()}/perfil/${user._id || user.id}`
     },
-    text: `Tus datos personales fueron actualizados (${fields}). Si no fuiste vos, cambia tu contrasena.`
+    text: `Tus datos personales fueron actualizados (${fields}). Si no fuiste vos, cambiá tu contraseña.`
   });
 };
 
-// ─── 9. CONTRASENA CAMBIADA ─────────────────────────────────────────
+// ─── 9. CONTRASEÑA CAMBIADA ─────────────────────────────────────────
 const sendPasswordChanged = (user) => {
+  const to = getEmail(user);
+  if (!to) return;
   safeSend('password-changed', {
-    to: user.email,
-    subject: 'Tu contrasena fue cambiada',
+    to,
+    subject: 'Tu contraseña fue cambiada',
     template: 'password-changed',
     templateData: {
-      firstName: user.firstName || user.name || ''
+      firstName: getName(user)
     },
-    text: 'Tu contrasena fue cambiada exitosamente. Si no fuiste vos, contacta soporte.'
+    text: 'Tu contraseña fue cambiada exitosamente. Si no fuiste vos, contactá soporte.'
   });
 };
 
-// ─── 10. VERIFICACION KYC RESULTADO ────────────────────────────────
+// ─── 10. VERIFICACIÓN KYC RESULTADO ────────────────────────────────
 const sendVerificationResult = (user, approved, rejectionReason) => {
+  const to = getEmail(user);
+  if (!to) return;
   const label = approved ? 'aprobada' : 'rechazada';
   safeSend('verification-result', {
-    to: user.email,
-    subject: `Tu verificacion fue ${label}`,
+    to,
+    subject: `Tu verificación fue ${label}`,
     template: 'verification-result',
     templateData: {
-      firstName: user.firstName || user.name || '',
+      firstName: getName(user),
       approved,
       rejectionReason: rejectionReason || null,
       profileUrl: `${FRONTEND_URL()}/perfil/verificacion`
     },
-    text: `Tu verificacion fue ${label}.${rejectionReason ? ' Motivo: ' + rejectionReason : ''}`
+    text: `Tu verificación fue ${label}.${rejectionReason ? ' Motivo: ' + rejectionReason : ''}`
   });
 };
 
 // ─── 11. DIGEST (NOTIFICACIONES + CHATS SIN RESPONDER) ─────────────
 const sendDigest = (user, { unreadNotifications, notificationSamples, unansweredChats, chatSamples }) => {
+  const to = getEmail(user);
+  if (!to) return;
+  const pending = (unreadNotifications || 0) + (unansweredChats || 0);
   safeSend('digest', {
-    to: user.email,
-    subject: `Tenes ${unreadNotifications + unansweredChats} cosas pendientes en Tirito`,
+    to,
+    subject: `Tenés ${pending} cosas pendientes en Tirito`,
     template: 'digest',
     templateData: {
-      firstName: user.firstName || user.name || '',
+      firstName: getName(user),
       unreadNotifications: unreadNotifications || 0,
       notificationSamples: notificationSamples || [],
       unansweredChats: unansweredChats || 0,
       chatSamples: chatSamples || [],
       frontendUrl: FRONTEND_URL()
     },
-    text: `Tenes ${unreadNotifications} notificaciones sin leer y ${unansweredChats} chats sin responder.`
+    text: `Tenés ${unreadNotifications || 0} notificaciones sin leer y ${unansweredChats || 0} chats sin responder.`
   });
 };
 
