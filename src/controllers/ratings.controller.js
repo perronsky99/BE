@@ -24,6 +24,13 @@ const createRating = async (req, res, next) => {
       return res.status(400).json({ message: 'No podés calificarte a vos mismo' });
     }
 
+    // Validar que el rater sea participante del tirito (creador o asignado)
+    const creatorId = tirito.createdBy ? tirito.createdBy.toString() : null;
+    const assignedId = tirito.assignedTo ? tirito.assignedTo.toString() : null;
+    if (raterId.toString() !== creatorId && raterId.toString() !== assignedId) {
+      return res.status(403).json({ message: 'Solo los participantes del tirito pueden calificar' });
+    }
+
     // Evitar duplicados por mismo tirito y rater
     const exists = await Rating.findOne({ tiritoId, raterId, targetId });
     if (exists) return res.status(400).json({ message: 'Ya calificaste este tirito para este usuario' });

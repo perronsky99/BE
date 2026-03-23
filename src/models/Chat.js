@@ -18,5 +18,6 @@ const chatSchema = new mongoose.Schema({
 
 chatSchema.index({ tiritoId: 1 });
 chatSchema.index({ participants: 1 });
+chatSchema.index({ tiritoId: 1, participants: 1 });
 
 module.exports = mongoose.model('Chat', chatSchema);

@@ -60,7 +60,7 @@ const register = async (req, res, next) => {
       return res.status(400).json({ message: 'La cédula ya está registrada' });
     }
 
-    // Crear usuario
+    // Crear usuario (SIEMPRE role='user' - nunca confiar en frontend)
     const user = await User.create({
       firstName,
       lastName,
@@ -74,7 +74,7 @@ const register = async (req, res, next) => {
       phoneLocal: phoneLocal || null,
       email,
       password,
-      role: role || 'user',
+      role: 'user',
       bio: bio || null
     });
 

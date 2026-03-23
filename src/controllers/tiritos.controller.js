@@ -58,11 +58,12 @@ const getTiritos = async (req, res, next) => {
       filter.status = { $ne: 'closed' };
     }
 
-    // Búsqueda por texto en título o descripción
+    // Búsqueda por texto en título o descripción (escapar regex para evitar ReDoS)
     if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { title: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } }
       ];
     }
 
@@ -204,11 +205,19 @@ const updateTiritoStatus = async (req, res, next) => {
     // - Cualquier usuario autenticado puede "tomar" un tirito abierto (marcar in_progress)
     // - Solo el creador puede cerrar o reabrir su propio tirito
     if (status === 'in_progress' && !isCreator && tirito.status === 'open') {
-      // Otro usuario toma el trabajo
-      tirito.status = 'in_progress';
-      tirito.assignedTo = userId;
-      await tirito.save();
-      console.log('[updateTiritoStatus] Tirito taken by:', userId);
+      // Operación atómica para evitar race condition
+      const claimed = await Tirito.findOneAndUpdate(
+        { _id: req.params.id, status: 'open', assignedTo: null },
+        { $set: { status: 'in_progress', assignedTo: userId } },
+        { new: true }
+      );
+      if (!claimed) {
+        return res.status(409).json({ message: 'Este tirito ya fue tomado por otro usuario' });
+      }
+      await claimed.populate('createdBy', 'name email username');
+      await claimed.populate('assignedTo', 'name email username');
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      return res.json({ message: 'Status actualizado', tirito: transformTirito(claimed, baseUrl) });
     } else if (isCreator) {
       // El creador puede cambiar cualquier estado de su tirito
       tirito.status = status;

@@ -18,14 +18,11 @@ const getInitials = (name) => {
 };
 
 /**
- * Transforma usuario DB a objeto público para frontend
- * Incluye datos públicos y datos sensibles (el frontend decide qué mostrar)
+ * Perfil PÚBLICO - Solo datos seguros, nunca PII
  */
 const transformPublicUser = (user) => ({
   id: user._id.toString(),
-  // Username es el alias público
   username: user.username,
-  // Nombre completo generado
   name: user.username || user.name,
   initials: getInitials(user.username || user.name),
   role: user.role,
@@ -33,16 +30,17 @@ const transformPublicUser = (user) => ({
   avatar: user.avatar || null,
   bio: user.bio || null,
   createdAt: user.createdAt,
-  
-  // Datos personales (el frontend decide si mostrarlos según permisos)
+  estado: user.estado || null,
+  municipio: user.municipio || null
+});
+
+/**
+ * Perfil PRIVADO - Incluye datos sensibles (solo para relaciones confirmadas)
+ */
+const transformPrivateUser = (user) => ({
+  ...transformPublicUser(user),
   firstName: user.firstName || null,
   lastName: user.lastName || null,
-  
-  // Ubicación general (público)
-  estado: user.estado || null,
-  municipio: user.municipio || null,
-  
-  // Datos sensibles (el frontend los oculta hasta que haya trabajo aceptado)
   documentType: user.documentType || null,
   documentNumber: user.documentNumber || null,
   birthDate: user.birthDate || null,
@@ -52,7 +50,9 @@ const transformPublicUser = (user) => ({
   email: user.email || null
 });
 
-// GET /api/profiles/:id  (público)
+const Tirito = require('../models/Tirito');
+
+// GET /api/profiles/:id  (público, con PII condicional si hay tirito compartido)
 const getProfile = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -62,6 +62,27 @@ const getProfile = async (req, res, next) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
+    // Si hay usuario autenticado, verificar si comparten tirito
+    const requesterId = req.user && req.user.id;
+    if (requesterId && requesterId !== id) {
+      const shared = await Tirito.findOne({
+        status: { $in: ['in_progress', 'closed'] },
+        $or: [
+          { createdBy: requesterId, assignedTo: id },
+          { createdBy: id, assignedTo: requesterId }
+        ]
+      });
+      if (shared) {
+        return res.json(transformPrivateUser(user));
+      }
+    }
+
+    // Propio perfil → datos completos
+    if (requesterId && requesterId === id) {
+      return res.json(transformPrivateUser(user));
+    }
+
+    // Default: solo datos públicos
     res.json(transformPublicUser(user));
   } catch (error) {
     next(error);
