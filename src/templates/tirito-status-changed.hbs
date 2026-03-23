@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tirito actualizado</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+            background: #f5f7fb;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            background: linear-gradient(90deg, #6a5af9, #8e44fd);
+            color: #fff;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .content {
+            padding: 24px;
+            color: #333;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-open {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .status-in_progress {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-closed {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 20px;
+            background: #6a5af9;
+            color: #fff;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .footer {
+            padding: 16px;
+            text-align: center;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Tirito</div>
+        </div>
+        <div class="content">
+            <h3 style="margin-top:0">Hola {{firstName}},</h3>
+            <p>Tu tirito <strong>"{{tiritoTitle}}"</strong> cambio de estado:</p>
+
+            <p style="text-align:center; margin:20px 0">
+                <span class="status-badge status-{{newStatus}}">{{statusLabel}}</span>
+            </p>
+
+            {{#if assignedToName}}
+            <p>Asignado a: <strong>{{assignedToName}}</strong></p>
+            {{/if}}
+
+            <p style="text-align:center; margin:18px 0">
+                <a class="btn" href="{{tiritoUrl}}">Ver tirito</a>
+            </p>
+
+            <p class="muted">{{statusMessage}}</p>
+        </div>
+        <div class="footer">Saludos — El equipo de Tirito</div>
+    </div>
+</body>
+
+</html>

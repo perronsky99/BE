@@ -1,6 +1,7 @@
 const Rating = require('../models/Rating');
 const Tirito = require('../models/Tirito');
 const mongoose = require('mongoose');
+const emailService = require('../utils/emailService');
 
 // POST /api/ratings
 const createRating = async (req, res, next) => {
@@ -36,6 +37,22 @@ const createRating = async (req, res, next) => {
     if (exists) return res.status(400).json({ message: 'Ya calificaste este tirito para este usuario' });
 
     const rating = await Rating.create({ tiritoId, raterId, targetId, score, comment });
+
+    // Email: calificacion recibida
+    const User = require('../models/User');
+    const [targetUser, raterUser] = await Promise.all([
+      User.findById(targetId).select('email firstName name'),
+      User.findById(raterId).select('name username')
+    ]);
+    if (targetUser) {
+      emailService.sendRatingReceived(
+        targetUser,
+        raterUser?.username || raterUser?.name || 'Alguien',
+        tirito,
+        score,
+        comment
+      );
+    }
 
     res.status(201).json({ message: 'Calificación creada', rating });
   } catch (err) {

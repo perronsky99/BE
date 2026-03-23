@@ -1,6 +1,7 @@
 const VerificationRequest = require('../models/VerificationRequest');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
+const emailService = require('../utils/emailService');
 
 // POST /api/verification/submit - Enviar documentos para verificación
 const submitVerification = async (req, res, next) => {
@@ -144,8 +145,12 @@ const reviewVerification = async (req, res, next) => {
       meta: { verificationId: verification._id }
     });
 
+    // Email: notificar resultado de verificación KYC
+    const approved = action === 'approve';
+    emailService.sendVerificationResult(user, approved, approved ? null : rejectionReason);
+
     res.json({
-      message: action === 'approve' ? 'Usuario verificado exitosamente' : 'Verificación rechazada',
+      message: approved ? 'Usuario verificado exitosamente' : 'Verificación rechazada',
       verification: {
         id: verification._id,
         status: verification.status,

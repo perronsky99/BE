@@ -1,6 +1,7 @@
 const TiritoRequest = require('../models/TiritoRequest');
 const Tirito = require('../models/Tirito');
 const Notification = require('../models/Notification');
+const emailService = require('../utils/emailService');
 
 /**
  * POST /api/tirito-requests
@@ -55,6 +56,18 @@ const createRequest = async (req, res, next) => {
       tiritoId: tirito._id,
       actionUrl: `/solicitudes`
     });
+
+    // Email: alguien esta interesado en tu tirito
+    const User = require('../models/User');
+    const creatorFull = await User.findById(tirito.createdBy._id).select('email firstName name');
+    if (creatorFull) {
+      emailService.sendTiritoRequestNew(
+        creatorFull,
+        request.requester.name || 'Alguien',
+        tirito,
+        message || null
+      );
+    }
 
     if (io) {
       io.to(`user_${tirito.createdBy._id}`).emit('notification', notification);
@@ -243,6 +256,12 @@ const acceptRequest = async (req, res, next) => {
       io.to(`user_${request.requester._id}`).emit('notification', notification);
     }
 
+    // Email: solicitud aceptada
+    const requesterFull = await User.findById(request.requester._id).select('email firstName name');
+    if (requesterFull) {
+      emailService.sendRequestResult(requesterFull, tirito.title, tirito._id, true);
+    }
+
     res.json({ 
       message: 'Solicitud aceptada',
       request: { id: request._id, status: 'accepted' }
@@ -296,6 +315,12 @@ const rejectRequest = async (req, res, next) => {
 
     if (io) {
       io.to(`user_${request.requester._id}`).emit('notification', notification);
+    }
+
+    // Email: solicitud rechazada
+    const requesterFullR = await User.findById(request.requester._id).select('email firstName name');
+    if (requesterFullR) {
+      emailService.sendRequestResult(requesterFullR, request.tirito.title, request.tirito._id, false);
     }
 
     res.json({ 

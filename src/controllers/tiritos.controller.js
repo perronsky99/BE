@@ -1,6 +1,7 @@
 const Tirito = require('../models/Tirito');
 const Subscription = require('../models/Subscription');
 const { PLAN_LIMITS } = require('../models/Subscription');
+const emailService = require('../utils/emailService');
 
 /**
  * Obtiene las iniciales de un nombre o username
@@ -155,7 +156,10 @@ const createTirito = async (req, res, next) => {
       createdBy: userId
     });
 
-    await tirito.populate('createdBy', 'name email username');
+    await tirito.populate('createdBy', 'name email username firstName');
+
+    // Email: tirito creado
+    emailService.sendTiritoCreated(tirito.createdBy, tirito);
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.status(201).json({
@@ -214,8 +218,15 @@ const updateTiritoStatus = async (req, res, next) => {
       if (!claimed) {
         return res.status(409).json({ message: 'Este tirito ya fue tomado por otro usuario' });
       }
-      await claimed.populate('createdBy', 'name email username');
-      await claimed.populate('assignedTo', 'name email username');
+      await claimed.populate('createdBy', 'name email username firstName');
+      await claimed.populate('assignedTo', 'name email username firstName');
+
+      // Email: tirito cambio de estado al creador
+      emailService.sendTiritoStatusChanged(
+        claimed.createdBy, claimed, 'in_progress',
+        claimed.assignedTo?.username || claimed.assignedTo?.name
+      );
+
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       return res.json({ message: 'Status actualizado', tirito: transformTirito(claimed, baseUrl) });
     } else if (isCreator) {
@@ -229,8 +240,21 @@ const updateTiritoStatus = async (req, res, next) => {
       return res.status(403).json({ message: 'No tenés permiso para modificar este tirito' });
     }
 
-    await tirito.populate('createdBy', 'name email username');
-    await tirito.populate('assignedTo', 'name email username');
+    await tirito.populate('createdBy', 'name email username firstName');
+    await tirito.populate('assignedTo', 'name email username firstName');
+
+    // Email: status cambio (creador)
+    emailService.sendTiritoStatusChanged(
+      tirito.createdBy, tirito, status,
+      tirito.assignedTo?.username || tirito.assignedTo?.name
+    );
+
+    // Email: si se cerro, notificar tambien al asignado
+    if (status === 'closed' && tirito.assignedTo?.email) {
+      emailService.sendTiritoStatusChanged(
+        tirito.assignedTo, tirito, status, null
+      );
+    }
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({

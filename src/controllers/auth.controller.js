@@ -3,6 +3,7 @@ const { generateToken } = require('../utils/jwt');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const mailer = require('../utils/mailer');
+const emailService = require('../utils/emailService');
 const PasswordResetAttempt = require('../models/PasswordResetAttempt');
 
 // POST /api/auth/register
@@ -291,6 +292,9 @@ const resetPassword = async (req, res, next) => {
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save({ validateBeforeSave: false });
+
+    // Email: confirmar cambio de contraseña (seguridad)
+    emailService.sendPasswordChanged(user);
 
     return res.json({ message: 'Contraseña restablecida correctamente' });
   } catch (error) {

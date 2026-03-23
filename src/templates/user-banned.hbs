@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Usuario baneado</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+            background: #f5f7fb;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            background: #dc2626;
+            color: #fff;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .content {
+            padding: 24px;
+            color: #333;
+        }
+
+        .info-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .info-box p {
+            margin: 6px 0;
+            font-size: 14px;
+        }
+
+        .label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .footer {
+            padding: 16px;
+            text-align: center;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Tirito</div>
+        </div>
+        <div class="content">
+            <h3 style="margin-top:0">Hola {{firstName}},</h3>
+            <p>Tu cuenta en Tirito ha sido <strong>{{actionLabel}}</strong>.</p>
+
+            <div class="info-box">
+                <p><span class="label">Motivo:</span> {{reason}}</p>
+                {{#if duration}}
+                <p><span class="label">Duracion:</span> {{duration}}</p>
+                {{else}}
+                <p><span class="label">Duracion:</span> Permanente</p>
+                {{/if}}
+                <p><span class="label">Fecha:</span> {{date}}</p>
+            </div>
+
+            <p class="muted">Si crees que esto es un error, podes contactar al equipo de soporte respondiendo a este
+                correo.</p>
+        </div>
+        <div class="footer">Saludos — El equipo de Tirito</div>
+    </div>
+</body>
+
+</html>

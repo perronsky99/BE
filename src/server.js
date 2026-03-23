@@ -57,6 +57,10 @@ const startServer = async () => {
     const socketUtil = require('./utils/socket');
     socketUtil.init(server);
 
+    // Iniciar cron de digest diario
+    const { startDigestCron } = require('./cron/digestCron');
+    startDigestCron();
+
     server.listen(port, () => {
       logger.info(`🚀 Servidor corriendo en http://localhost:${port}`);
       logger.info(`📋 Health check: http://localhost:${port}/api/health`);

@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Resumen de actividad</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+            background: #f5f7fb;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            background: linear-gradient(90deg, #6a5af9, #8e44fd);
+            color: #fff;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .content {
+            padding: 24px;
+            color: #333;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f5;
+        }
+
+        .stat-label {
+            color: #555;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            color: #6a5af9;
+        }
+
+        .section {
+            margin: 16px 0;
+        }
+
+        .section h4 {
+            margin: 0 0 8px 0;
+            color: #6a5af9;
+        }
+
+        .item {
+            padding: 8px 12px;
+            background: #f8f9ff;
+            border-radius: 6px;
+            margin: 6px 0;
+            font-size: 14px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 20px;
+            background: #6a5af9;
+            color: #fff;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .footer {
+            padding: 16px;
+            text-align: center;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Tirito</div>
+        </div>
+        <div class="content">
+            <h3 style="margin-top:0">Hola {{firstName}},</h3>
+            <p>Tenes actividad pendiente en Tirito:</p>
+
+            {{#if unreadNotifications}}
+            <div class="section">
+                <h4>Notificaciones sin leer ({{unreadNotifications}})</h4>
+                {{#each notificationSamples}}
+                <div class="item">{{this.title}}: {{this.message}}</div>
+                {{/each}}
+            </div>
+            {{/if}}
+
+            {{#if unansweredChats}}
+            <div class="section">
+                <h4>Chats sin responder ({{unansweredChats}})</h4>
+                {{#each chatSamples}}
+                <div class="item">{{this.senderName}} en "{{this.tiritoTitle}}": "{{this.lastMessage}}"</div>
+                {{/each}}
+            </div>
+            {{/if}}
+
+            <p style="text-align:center; margin:18px 0">
+                <a class="btn" href="{{frontendUrl}}">Ir a Tirito</a>
+            </p>
+
+            <p class="muted">Este es un resumen automatico. Se envia como maximo una vez al dia.</p>
+        </div>
+        <div class="footer">Saludos — El equipo de Tirito</div>
+    </div>
+</body>
+
+</html>

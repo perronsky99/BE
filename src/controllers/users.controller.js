@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const emailService = require('../utils/emailService');
 
 // GET /api/users/me
 const getMe = async (req, res, next) => {
@@ -54,6 +55,12 @@ const updateMe = async (req, res, next) => {
 
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    // Email: notificar cambio de perfil (seguridad)
+    const changedFields = Object.keys(updates);
+    if (changedFields.length > 0) {
+      emailService.sendProfileUpdated(user, changedFields);
     }
 
     res.json({

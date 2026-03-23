@@ -1,6 +1,7 @@
 const Report = require('../models/Report');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
+const emailService = require('../utils/emailService');
 
 // POST /api/reports
 const createReport = async (req, res, next) => {
@@ -114,6 +115,10 @@ const handleReportAction = async (req, res, next) => {
       report.status = 'reviewed';
       report.handledBy = req.user.id;
       await report.save();
+
+      // Email: usuario baneado
+      emailService.sendUserBanned(target, target.banReason, durationDays || null);
+
       return res.json({ message: 'Usuario baneado/suspendido', userId: target._id });
     }
 
