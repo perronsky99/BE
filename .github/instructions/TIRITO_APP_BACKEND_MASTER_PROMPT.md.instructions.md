@@ -1,247 +1,192 @@
-Acá tenés EL PROMPT MAESTRO DEL BACKEND, al mismo nivel de calidad y rigor que el frontend.
-Esto está pensado para pegarlo TAL CUAL en VS Code + GitHub Copilot (modelo Opus 4.5) y que te genere un backend pragmático, simple y alineado 100% con Tirito App.
+🧠 TIRITO APP BACKEND — AUDITORÍA COMPLETA (VALIDACIÓN REAL)
 
-🧠 MASTER PROMPT — TIRITO APP v1.0 BACKEND
+Estás analizando el BACKEND REAL ya implementado de una aplicación llamada Tirito App.
 
-(Node.js · Express · MongoDB · JWT · Pragmatic Mode)
+NO estás generando código desde cero.
+NO estás proponiendo arquitecturas nuevas.
 
-⸻
-
-📌 CONTEXTO GENERAL (OBLIGATORIO)
-
-Estás construyendo el BACKEND REAL de una aplicación llamada Tirito App.
-
-Este backend NO es experimental, NO es demo, NO es mock.
-Es un backend simple, real, aburrido y confiable, pensado para un MVP en producción.
-
-El frontend ya está definido y congelado como:
-
-“Tirito App v1.0 – Frontend (Frozen)”
-
-Tu tarea es implementar exactamente lo que ese frontend necesita,
-ni más, ni menos.
+👉 Tu tarea es auditar TODO el backend actual y compararlo contra este contrato.
 
 ⸻
 
-🎯 OBJETIVO DEL BACKEND v1.0
-	•	Autenticación real
-	•	Persistencia real
-	•	Reglas reales
-	•	Seguridad real
-	•	Cero sobreingeniería
+📌 CONTEXTO
 
-❌ No microservicios
-❌ No DDD forzado
-❌ No Clean Architecture de libro
-❌ No GraphQL
-❌ No CQRS
-❌ No colas
-❌ No eventos
+El frontend YA existe, está avanzado y conectado al backend.
 
-⸻
+El backend debe ser:
+	•	simple
+	•	pragmático
+	•	seguro
+	•	funcional para MVP
 
-🧱 STACK OBLIGATORIO
+Stack esperado:
 	•	Node.js (LTS)
 	•	Express
 	•	MongoDB + Mongoose
 	•	JWT (Bearer)
 	•	bcrypt
-	•	multer (uploads)
+	•	multer
 	•	dotenv
-	•	CORS habilitado
-	•	JSON only
 
 ⸻
 
-🗂️ ESTRUCTURA DEL PROYECTO (OBLIGATORIA)
-src/
-  config/
-    env.js
-    db.js
-  models/
-    User.js
-    Tirito.js
-    Chat.js
-    Message.js
-  routes/
-    auth.routes.js
-    users.routes.js
-    tiritos.routes.js
-    chats.routes.js
-  controllers/
-    auth.controller.js
-    users.controller.js
-    tiritos.controller.js
-    chats.controller.js
-  middlewares/
-    auth.middleware.js
-    error.middleware.js
-  utils/
-    jwt.js
-    upload.js
-  app.js
-  server.js
+🎯 OBJETIVO
 
-📌 No inventar carpetas
-📌 No abstraer de más
+Determinar:
 
-👤 MODELO USER (DEFINITIVO)
-{
-  name: String,
-  email: String (unique),
-  password: String (hashed),
-  role: 'user' | 'worker' | 'business',
-  verificationStatus: 'unverified' | 'pending' | 'verified' | 'rejected',
-  createdAt: Date
-}
+👉 ¿El backend actual está alineado con un MVP listo para BETA CERRADA?
 
-🔐 AUTH (REAL, SIMPLE)
+Si NO lo está:
 
-Endpoints
-	•	POST /api/auth/register
-	•	POST /api/auth/login
-
-Reglas
-	•	Password hasheado con bcrypt
-	•	JWT con:
-
-{
-  sub: userId,
-  role,
-  iat,
-  exp
-}
-
-	•	Expiración razonable (ej: 7 días)
-	•	Sin refresh tokens en v1.0
+👉 Listar EXACTAMENTE qué falta o qué está mal
 
 ⸻
 
-🧠 MODELO TIRITO (CENTRAL)
+🧠 ALCANCE REAL ESPERADO
 
-{
-  title: String,
-  description: String,
-  images: [String],
-  status: 'open' | 'in_progress' | 'closed',
-  createdBy: ObjectId(User),
-  createdAt: Date
-}
+El backend debe cubrir SOLO:
+	•	Autenticación (login/register)
+	•	Usuarios
+	•	Tiritos
+	•	Chat básico
 
-🚫 REGLA CLAVE — LÍMITE DE PUBLICACIONES
-
-Antes de crear un tirito:
-	•	Contar tiritos activos (open | in_progress) del usuario
-	•	Si ya tiene 1 activo → rechazar
-
-Respuesta:
-
-{
-  "message": "Ya tenés un tirito activo"
-}
-
-📌 El backend es la ÚNICA autoridad
-📌 El frontend solo muestra el mensaje
+El resto (ratings, pagos, admin, etc.) NO es obligatorio en esta fase.
 
 ⸻
 
-📸 UPLOADS
-	•	Máx 5 imágenes por tirito
-	•	Máx 5MB cada una
-	•	Guardar solo URL / path
-	•	Validar tipo imagen
-	•	Usar multer
+🔍 ANALIZA TODO EL PROYECTO
+
+Debes revisar:
+	•	models
+	•	routes
+	•	controllers
+	•	middlewares
+	•	utils
+	•	configuración general
 
 ⸻
 
-💬 CHAT
+🔒 VALIDACIONES CRÍTICAS (OBLIGATORIO)
 
-Modelo Chat
-
-{
-  tiritoId: ObjectId,
-  participants: [ObjectId(User)],
-  createdAt: Date
-}
-
-Modelo Message
-
-{
-  chatId: ObjectId,
-  sender: ObjectId(User),
-  content: String,
-  createdAt: Date
-}
-
-Reglas
-	•	Chat solo existe si hay tirito
-	•	No estados legales
-	•	No aceptación de trabajo
+Detectar:
+	•	Escalación de privilegios (role en register)
+	•	Exposición de datos sensibles (PII)
+	•	Race conditions (ej: tomar tirito)
+	•	Falta de validación de inputs
+	•	Regex injection (si hay búsquedas)
+	•	Falta de control de acceso
+	•	Endpoints sin protección JWT
 
 ⸻
 
-🌐 ENDPOINTS PRINCIPALES
+🧱 MODELOS (VALIDAR)
 
-Tiritos
-	•	GET /api/tiritos
-	•	GET /api/tiritos/:id
-	•	POST /api/tiritos
-	•	PATCH /api/tiritos/:id/status
+User
+	•	password hasheado
+	•	email unique
+	•	role controlado
+	•	campos coherentes
 
-Chats
-	•	GET /api/chats/:tiritoId
-	•	POST /api/chats/:tiritoId/message
+Tirito
+	•	status correcto (open / in_progress / closed)
+	•	relación con user
+	•	validación de creación
 
-⸻
-
-🔒 SEGURIDAD (CLAVE)
-	•	Middleware JWT obligatorio en rutas privadas
-	•	Verificar ownership:
-	•	solo creador puede cerrar tirito
-	•	El frontend NO decide nada
-	•	Siempre validar en backend
+Chat / Message
+	•	participantes correctos
+	•	relación con tirito
 
 ⸻
 
-❌ PROHIBIDO IMPLEMENTAR EN v1.0
-	•	Pagos
-	•	Escrow
-	•	Reputación
-	•	Admin
-	•	Moderación automática
-	•	Notificaciones push
-	•	Roles avanzados
-	•	Refresh tokens
+⚙️ REGLAS DE NEGOCIO (CRÍTICAS)
+
+Validar:
+	•	❗ Máximo 1 tirito activo por usuario
+	•	❗ Solo el creador puede cerrar el tirito
+	•	❗ Chat solo entre participantes
+	•	❗ Backend decide todo, no el frontend
 
 ⸻
 
-🧑‍💻 ESTILO DE CÓDIGO
-	•	Código simple y legible
-	•	Funciones chicas
-	•	Nombres claros
-	•	Manejo de errores consistente
-	•	Respuestas JSON claras
-	•	Nada “mágico”
+🔐 SEGURIDAD (CRÍTICO)
+
+Verificar si existe:
+	•	JWT middleware funcionando
+	•	bcrypt correcto
+	•	helmet (o equivalente)
+	•	CORS configurado correctamente
+	•	rate limiting básico
+	•	validación de inputs
+	•	sanitización básica
+	•	no exposición de errores internos
 
 ⸻
 
-🧠 MANEJO DE ERRORES
-	•	Centralizar errores
-	•	Mensajes humanos
-	•	Status HTTP correctos
-	•	No stacktrace en producción
+📦 UPLOADS
+	•	multer configurado
+	•	validación tipo archivo
+	•	límite tamaño (5MB)
+	•	límite cantidad (máx 5)
 
 ⸻
 
-🗿 REGLA FINAL (CONTRATO)
-
-Este backend existe para servir al frontend definido.
-No se optimiza prematuramente.
-No se sobrearquitecta.
-No se reescribe sin motivo.
+🚨 ERRORES
+	•	middleware de error centralizado
+	•	respuestas consistentes
+	•	status HTTP correctos
+	•	no stacktrace en producción
 
 ⸻
 
-✅ INSTRUCCIÓN FINAL PARA COPILOT
+🧠 PERFORMANCE BÁSICA
+	•	índices en Mongo
+	•	queries simples
+	•	sin lógica innecesaria
 
-Generá TODO el backend de Tirito App v1.0 siguiendo este documento como única fuente de verdad.
+⸻
+
+⛔ REGLAS
+
+NO:
+	•	proponer microservicios
+	•	cambiar stack
+	•	reescribir todo
+	•	agregar complejidad innecesaria
+
+👉 SOLO evaluar lo existente y mejorarlo
+
+⸻
+
+🧾 FORMATO DE RESPUESTA (OBLIGATORIO)
+
+Responder EXACTAMENTE así:
+
+1. Estado general del backend
+
+(¿Está listo o no para beta?)
+
+2. Problemas CRÍTICOS (bloqueantes)
+
+(lista clara y corta)
+
+3. Problemas IMPORTANTES
+
+(lista)
+
+4. Problemas MENORES
+
+(lista)
+
+5. Recomendaciones mínimas
+
+(solo lo necesario)
+
+6. Veredicto final
+
+(¿Puede salir a beta o no? y qué falta EXACTAMENTE)
+
+⸻
+
+🧠 INSTRUCCIÓN FINAL
+
+Analiza TODO el backend actual del proyecto Tirito App y dame un diagnóstico completo, preciso y accionable.
