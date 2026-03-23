@@ -1,25 +1,38 @@
-# CHANGES
+# CHANGES - Tirito App Backend
 
-Resumen de cambios importantes en el backend de Tirito App.
+Resumen de cambios importantes. Para el registro completo con versiones, ver CHANGELOG.md.
 
-## 2026-01-06 — Limpieza y nuevas funcionalidades
+## 2026-03-22 - v0.2.0 Security Hardening + Feature Documentation
 
-- Limpiado `README.md` eliminando contenidos del template externo y dejándolo enfocado al desarrollo del backend.
-- Añadido sistema de notificaciones:
-  - Modelo `Notification` (schema en `src/models/`).
-  - Controller y rutas en `src/controllers/notifications.controller.js` y `src/routes/notifications.routes.js`.
-  - Endpoint de prueba: `POST /api/notifications/test/:userId` para crear y emitir notificaciones (protegido y rate-limited).
-- Realtime/Socket:
-  - Integración de `socket.io` en `src/utils/socket.js`.
-  - Handshake JWT obligatorio: el servidor valida `auth.token` y une sockets a la sala `user_<userId>`.
-- Harden de seguridad y límites:
-  - Rate-limiting aplicado a endpoints sensibles (mensajes y endpoint de prueba).
-  - Verificación JWT centralizada para rutas privadas y sockets.
-- Observabilidad mínima:
-  - Logger ligero (JSON) y métricas en memoria disponibles en `GET /api/metrics`.
-- Herramientas de mantenimiento:
-  - Script `src/scripts/find-orphan-tiritos.js` para localizar tiritos huérfanos.
+### Security Fixes Criticos
+- Role injection: registro fuerza role=user siempre
+- PII exposure: perfil publico sin datos sensibles, acceso condicional por tirito compartido
+- Race condition: findOneAndUpdate atomico para claims
+- Rating validation: solo participantes pueden calificar
+- ReDoS: escape de regex en busqueda
+- Password minlength: 6 a 8 caracteres
 
----
+### Sistemas documentados por primera vez
+- Solicitudes de tirito (TiritoRequest)
+- Calificaciones (Rating) con reglas de participacion
+- Categorias jerarquicas
+- Planes y suscripciones (free/pro/business) MOCK
+- Verificacion KYC
+- Referidos
+- Estadisticas de usuario y niveles
+- Analytics admin
+- Consulta cedula externa
+- Password reset con CAPTCHA
+- Email multi-provider
 
-Si necesitas que exporte esto a `CHANGELOG.md` con entrada por versión semántica o que añada más detalle (commits/PRs relacionados), dime cómo prefieres el formato y lo adapto.
+## 2026-01-06 - v0.1.0 Sistema de notificaciones y moderacion
+
+- Notificaciones con Socket.IO
+- Reportes y moderacion
+- Bans con audit trail
+- Metricas en memoria
+
+## 2025-12-01 - v0.0.1 Inicio
+
+- Estructura base
+- Auth JWT, modelos iniciales

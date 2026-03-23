@@ -1,18 +1,38 @@
-# Notificaciones - Pruebas y Operación
+# Notificaciones - Tirito App Backend
 
-Este documento resume cómo probar y operar el sistema de notificaciones en desarrollo.
+## Sistema de Notificaciones
 
-Endpoints útiles:
+### Modelo
+Notificaciones se almacenan en MongoDB con TTL de 90 dias (auto-eliminacion).
 
-- `POST /api/notifications/test/:userId` (autenticado): crea y emite una notificación de prueba al usuario.
-- `GET /api/metrics` (público en dev): devuelve contadores básicos en JSON (`notifications_created`, `notifications_emitted`, ...).
+Tipos soportados:
+- `chat_new` - Nuevo chat creado
+- `chat_message` - Nuevo mensaje en chat existente
+- `tirito_status` - Cambio de estado de tirito
+- `tirito_request` - Nueva solicitud de tirito
+- `request_accepted` - Solicitud aceptada
+- `request_rejected` - Solicitud rechazada
+- `rating_request` - Solicitud de calificacion
+- `system` - Notificacion del sistema
 
-Recomendaciones rápidas:
+### Endpoints
+- `GET /api/notifications` - Listar notificaciones (auth, query: unreadOnly, limit, skip)
+- `GET /api/notifications/unread-count` - Contador no leidas (auth)
+- `PUT /api/notifications/:id/read` - Marcar como leida (auth)
+- `PUT /api/notifications/read-all` - Marcar todas como leidas (auth)
+- `DELETE /api/notifications/:id` - Eliminar (auth)
+- `POST /api/notifications/test/:userId` - Crear de prueba (auth, rate limit: 6/min)
 
-- Para probar realtime: abrir dos navegadores, loguear A y B. En A ejecutar `POST /api/notifications/test/<B_id>` con Authorization Bearer token de A. B debe recibir la notificación en tiempo real.
-- Si la notificación aparece para A en lugar de B, comprobar que el `recipientId` se calcula correctamente en `BE/src/controllers/chats.controller.js`.
+### Realtime (Socket.IO)
+- Conexion: `io(url, { auth: { token: JWT } })`
+- Sala: `user_<userId>`
+- Evento: `notification` - emitido cuando se crea notificacion
 
-Seguridad básica:
+### Pruebas
+1. Abrir dos navegadores, login como A y B
+2. Desde A: `POST /api/notifications/test/<B_id>` con Bearer token de A
+3. B debe recibir la notificacion en tiempo real
 
-- El socket valida JWT recibido en `handshake.auth.token`. El cliente debe conectar enviando `{ auth: { token } }`.
-- El endpoint de prueba está protegido y limitado por `express-rate-limit`.
+### Chat messages via socket
+- Evento: `chat_message` - emitido a participantes del chat
+- Payload: `{ chatId, tiritoId, message }`
